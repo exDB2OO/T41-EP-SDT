@@ -1,5 +1,5 @@
 #ifndef BEENHERE
-#define BEENHERERA8875_DISPLAYRA8875_DISPLAY
+#define BEENHERE
 
 //======================================== Library include files ========================================================
 #include <Adafruit_GFX.h>
@@ -34,7 +34,7 @@
 #define T4                                        // Says we are using a Teensy 4 or 4.1
 #define RA8875_DISPLAY              1             // Comment out if not using RA8875 display
 
-#define DEBUG                       1             // This must be uncommented for ANY debugging statements to work
+// #define DEBUG                       1             // This must be uncommented for ANY debugging statements to work
 //#define STORE_SWITCH_VALUES                       // Uncomment to save the analog switch values for your push button matrix
 
 #define OFF                         0
@@ -60,7 +60,7 @@
 // to be changed for the exact value for your system. They are initialized in the INO file.
 
 #define BUSY_ANALOG_PIN              39     // This is the analog pin that controls the 16 switches
-#define NOTHING_TO_SEE_HERE         950     // If the analog pin is greater than this value, nothing's going on
+#define NOTHING_TO_SEE_HERE         955     // If the analog pin is greater than this value, nothing's going on
 #define BOGUS_PIN_READ               -1     // If no push button read
 #define WIGGLE_ROOM                  15     // This is the number of pixels within which a switch analog value must fall
 #define SWITCH_DEBOUNCE_DELAY       50L     // Milliseconds for the switch to settle down

@@ -381,22 +381,23 @@ void EEPROMSaveDefaults()
 
   EEPROMData.spectrumNoiseFloor              = SPECTRUM_NOISE_FLOOR;  // 4 bytes
 
-  EEPROMData.switchValues[0]                 = 885;        // AFP 12-30-21
-  EEPROMData.switchValues[1]                 = 830;
-  EEPROMData.switchValues[2]                 = 776;
-  EEPROMData.switchValues[3]                 = 720;
-  EEPROMData.switchValues[4]                 = 670;
-  EEPROMData.switchValues[5]                 = 609;
-  EEPROMData.switchValues[6]                 = 559;
-  EEPROMData.switchValues[7]                 = 501;
-  EEPROMData.switchValues[8]                 = 438;
-  EEPROMData.switchValues[9]                 = 382;
-  EEPROMData.switchValues[10]                = 324;
-  EEPROMData.switchValues[11]                = 266;
-  EEPROMData.switchValues[12]                = 107;
-  EEPROMData.switchValues[13]                = 142;
-  EEPROMData.switchValues[14]                =  76;
-  EEPROMData.switchValues[15]                =  10;
+//DB2OO, 26.6.22: my switch values
+  EEPROMData.switchValues[0]                 = 883;        // AFP 12-30-21
+  EEPROMData.switchValues[1]                 = 827;
+  EEPROMData.switchValues[2]                 = 771;
+  EEPROMData.switchValues[3]                 = 717;
+  EEPROMData.switchValues[4]                 = 661;
+  EEPROMData.switchValues[5]                 = 605;
+  EEPROMData.switchValues[6]                 = 550;
+  EEPROMData.switchValues[7]                 = 488;
+  EEPROMData.switchValues[8]                 = 431;
+  EEPROMData.switchValues[9]                 = 374;
+  EEPROMData.switchValues[10]                = 316;
+  EEPROMData.switchValues[11]                = 257;
+  EEPROMData.switchValues[12]                = 197;
+  EEPROMData.switchValues[13]                = 132;
+  EEPROMData.switchValues[14]                =  67;
+  EEPROMData.switchValues[15]                =  2;
  
   EEPROMData.wordsPerMinute                  = 15; // 4 bytes
   EEPROMData.zetaHelp                        = 65; // 4 bytes

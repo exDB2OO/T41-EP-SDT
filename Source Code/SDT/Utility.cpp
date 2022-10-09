@@ -2,6 +2,9 @@
 #include "SDT.h"
 #endif
 
+//DB2OO; 18.7.22
+#define USE_W7PUA 1
+
 /*****
   Purpose: Generate Array with variable sinewave frequency tone AFP 05-17-22
   Parameter list:
@@ -417,6 +420,23 @@ void Calculatedbm()
 
   dbm = m_AverageMagdbm;                      // write average into variable for S-meter display
   dbmhz = m_AverageMagdbmhz;                  // write average into variable for S-meter display
+  
+  //DB2OO, 18.7.22: show dBm values through serial interface
+  Serial.println("dbm = dbm_calibration + (float32_t)RF_attenuation + slope * log10f (sum_db) + cons - (float32_t)bands[currentBand].RFgain * 1.5;");
+  Serial.print("Calculatedbm(): dBm=");
+  Serial.println(dbm);
+  Serial.print("dbm_calibration ");
+  Serial.print(dbm_calibration);
+  Serial.print(", RF_attenuation ");
+  Serial.println(RF_attenuation);
+  Serial.print("Slope, sum_db, cons ");
+  Serial.print(slope);
+  Serial.print(sum_db);
+  Serial.println(cons);
+  Serial.print("(float32_t)bands[currentBand].RFgain * 1.5 ");
+  Serial.println((float32_t)bands[currentBand].RFgain * 1.5);
+  Serial.println();
+  
 }
 
 

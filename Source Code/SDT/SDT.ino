@@ -1871,8 +1871,8 @@ void setup()
   *(digital_pin_to_info_PGM + TFT_CS)->pad  = iospeed_display;
 
   tuneEncoder.begin(true);
-
-  tft.begin(RA8875_800x480);              // Can do graphics now
+  //DB2OO, 18.7.22: SPI data rates need to be added per Jack Purdum #17074
+  tft.begin(RA8875_800x480, 16, 20000000UL, 4000000UL);              // parameter list from library code
   tft.setRotation(0);
 
   // Setup for scrolling attributes. Part of  initSpectrum_RA8875() call written by Mike Lewis
@@ -1899,7 +1899,7 @@ void setup()
   displayMode = BOTH_DISPLAYS;
 
   // ==============================================  Intial set up of EEPROM data ===============
-  //  EEPROMSaveDefaults();                           // uncomment this line first time running new Teensy to set up the EEPROM
+    EEPROMSaveDefaults();                           // uncomment this line first time running new Teensy to set up the EEPROM
 
 
   if (EEPROMData.version_of_settings[0] != 'V') {       // EEPROM has not been set
@@ -1919,7 +1919,7 @@ void setup()
   EEPROMShow();                                     // To see EEPROM values on Serial monitor
 #endif
 
-  currentFreqA    = TxRxFreq = centerFreq = 7047700L;   // Test freq for W1AW
+  currentFreqA    = TxRxFreq = centerFreq; //DB2OO, 27.6.22 = 7047700L;   // Test freq for W1AW
 
 #ifdef DEBUG
   currentFreqA    = TxRxFreq = centerFreq = 7047700L;
