@@ -13,10 +13,10 @@
 *****/
 int CWOptions()
 {
-  const char *cwChoices[]   = {"WPM", "Key Type", "Sidetone", "Paddle Flip", "Cancel"};   // Add code practice oscillator
+  const char *cwChoices[]   = {"WPM", "Key Type", "Paddle Flip", "Cancel"};   // Add code practice oscillator
   int CWChoice        = 0;
 
-  CWChoice = SubmenuSelect(cwChoices, 5, 0);
+  CWChoice = SubmenuSelect(cwChoices, 4, 0);
 
   switch (CWChoice) {
     case 0:                                 // WPM
@@ -28,18 +28,13 @@ int CWOptions()
       UpdateWPMField();
       break;
 
-    case 2:                                 // Sidetone default = 700;
-      SetKeyerSidetone();
-      break;
-
-    case 3:                                 // Flip paddles
+    case 2:                                 // Flip paddles
       DoPaddleFlip();
       break;
 
     default:                                // Cancel
       break;
   }
-
   return CWChoice;
 }
 
@@ -62,6 +57,8 @@ int SpectrumOptions()
     return currentScale;                                        // Nope.
 
   currentScale = spectrumSet;                                   // Yep...
+  EEPROMData.currentScale = currentScale;
+  EEPROMWrite();
   ShowSpectrumdBScale();
   return spectrumSet;
 }
@@ -79,10 +76,29 @@ int AGCOptions()
   const char *AGCChoices[]  = {"Off", "Slow", "Medium", "Fast", "Cancel"};
 
   AGCMode = SubmenuSelect(AGCChoices, 5, AGCMode);
-  if (AGCMode) {                                      // The opted for AGC
-    tft.setTextColor(RA8875_WHITE);
+
+  switch (AGCMode) {                                          // The opted for AGC
+    case 0:                                                   // Off
+      tft.fillRect(AGC_X_OFFSET, AGC_Y_OFFSET, 30, tft.getFontHeight(), RA8875_BLACK);
+      AGCPrep();
+      return AGCMode;
+      
+    case 1:                                                   // Slow
+      tft.setTextColor(RA8875_WHITE);
+      break;
+      
+    case 2:                                                   // Medium
+      tft.setTextColor(ORANGE);
+      break;
+      
+    case 3:                                                   // Fast
+      tft.setTextColor(RA8875_GREEN);
+      break;
+      
+    default:
+      break;
   }
-  tft.setCursor(BAND_INDICATOR_X + 180, BAND_INDICATOR_Y);
+  tft.setCursor(AGC_X_OFFSET, AGC_Y_OFFSET);    // Where to print
   tft.print("AGC");
 
   AGCPrep();
@@ -100,29 +116,26 @@ int AGCOptions()
 *****/
 int SetFilterValue()
 {
-  int currentValue, encoderChange, oldValue;
-  int val;
-
-  tft.fillRect(251, 0, 250, CHAR_HEIGHT, RA8875_MAGENTA);
+  tft.fillRect(SECONDARY_MENU_X, MENUS_Y, 250, CHAR_HEIGHT, RA8875_MAGENTA);
   tft.setTextColor(RA8875_WHITE);
-  tft.setCursor(252, 1);
-  tft.print("Value:");
-  tft.setCursor(450, 1);
-  switch (NR_Choice) {
+  tft.setCursor(SECONDARY_MENU_X, 1);
+  tft.print(" Value, ");
+  
+  switch (nrOptionSelect) {
     case 0:                                 // Off
       return 0;
       break;
 
     case 1:                                 // Kim
-      tft.print("Kim:");
+      tft.print("Kim: ");
       break;
 
     case 2:                                 // LMS 1
-      tft.print("LMS 1:");
+      tft.print("LMS 1: ");
       break;
 
     case 3:                                 // LMS 2
-      tft.print("LMS 2:");
+      tft.print("LMS 2: ");
       break;
 
     case 4:                                 // Cancel
@@ -130,44 +143,7 @@ int SetFilterValue()
       break;
 
   }
-  oldValue = currentValue = 50;
-  filterEncoder.write(oldValue);
-  MyDelay(150L);
-
-  while (true) {
-    currentValue = filterEncoder.read();
-    if (currentValue != oldValue) {
-      encoderChange = (currentValue - oldValue);    // How much the number changed
-      oldValue += encoderChange * 5;                // Chnage by 5 on each detent
-      if (oldValue < 0)
-        lastWPM = 5;
-      else if (oldValue > 100)
-        oldValue = 100;
-
-      filterEncoder.write(oldValue);
-
-      tft.fillRect(450, 0, 50, CHAR_HEIGHT, RA8875_MAGENTA);
-      tft.setCursor(450, 1);
-      tft.print(oldValue);
-    }
-    MyDelay(150L);
-
-    val = ReadSelectedPushButton();           // Read pin that controls all switches
-    if (val != -1) {                          // -1 not valid option choice
-      val = ProcessButtonPress(val);
-      MyDelay(150L);
-    }
-
-    if (val == MENU_OPTION_SELECT) {                             // Make a choice??
-      tft.fillRect(251, 0, 250, CHAR_HEIGHT, RA8875_BLACK);
-      EEPROMData.NR_Filter_Value = oldValue;
-      NR_Filter_Value = oldValue;
-      UpdateNoiseField();
-      break;
-    }
-  }
-  tft.fillRect(251, 0, 250, CHAR_HEIGHT, RA8875_BLACK);
-  return oldValue;
+  return GetEncoderValue(5, 100, 50, 5, (char *) " Value:  "); 
 }
 /*****
   Purpose: Present the noise reduction options
@@ -189,11 +165,9 @@ int NROptions()
 
   switch (nrOptionSelect) {
     case 0:                                 // Off
-      // NR_Choice = 0;
       break;
 
     case 1:                                 // Kim
-      //      kimValue = GetEncoderValue(0, 100, 50, 5);       // Argument: min, max, start, increment
       SetFilterValue();
       kimValue = NR_Filter_Value;
       NR_Choice = NR_Kim = 1;
@@ -201,14 +175,12 @@ int NROptions()
       break;
 
     case 2:                                 // Spectral
-      //      lms1 = GetEncoderValue(0, 100, 50, 5);          // Argument: min, max, start, increment
       SetFilterValue();
       NR_Choice = NR_LMS = 2;
       passBack = lms1;
       break;
 
     case 3:                                 // LMS
-      //      lms2 = GetEncoderValue(0, 100, 50, 5);          // Argument: min, max, start, increment
       SetFilterValue();
       NR_Choice = NR_LMS = 3;
       passBack = lms2;
@@ -218,8 +190,9 @@ int NROptions()
       NR_Choice = passBack = -1;
       break;
   }
-  tft.fillRect(0, 0, 600, CHAR_HEIGHT, RA8875_BLACK);         // Erase menu choices
-
+//  tft.fillRect(0, 0, 580, CHAR_HEIGHT, RA8875_BLACK);         // Erase menu choices
+  EraseMenus();
+  UpdateNoiseField();
   return passBack;
 }
 
@@ -231,7 +204,7 @@ int NROptions()
 
   Return value
     int               1 done for consistency of definition
-    
+
   CAUTION:  Sub menu selection for Rec IQ and transmit IQ
     Each set of adjustment first does IG gain factor and then IQ phase factor
     To use:
@@ -249,18 +222,12 @@ int IQOptions()
   static long XmitIQPhaseRead  = 0, last_XmitIQPhaseRead = 0;
   const char *IQOptions[] = {"Receive", "Transmit", "Cancel"};
   int val;
-/*
-  static float32_t IQ_amplitude_correction_factorOld;
-  static float32_t IQ_phase_correction_factorOld;
-  static float32_t IQ_Xamplitude_correction_factorOld;
-  static float32_t IQ_Xphase_correction_factorOld;
-*/  
+
   spectrum_zoom = 0;
 
   ZoomFFTPrep();
   UpdateZoomField();
   DrawFrequencyBarValue();
-//  BandInformation();
   ShowBandwidth();
 
   IQChoice = SubmenuSelect(IQOptions, 3, IQChoice);
@@ -270,7 +237,6 @@ int IQOptions()
       SetFreq();
 
       //== == == == == == == == == == == == == == == == == = Receive Gain == == == == == == == == ==
-      filterEncoder.write(0);
       tft.fillRect(251, 0, 250, CHAR_HEIGHT, RA8875_MAGENTA);
       tft.setFontScale(1);
       tft.setTextColor(RA8875_WHITE);
@@ -279,10 +245,8 @@ int IQOptions()
       tft.setCursor(400, 1);
       tft.print(IQ_amplitude_correction_factor);
       while (true) {
-        RecIQGainRead = filterEncoder.read();
         if (RecIQGainRead != last_RecIQGainRead) {
           IQ_amplitude_correction_factor = IQ_amplitude_correction_factor - RecIQGainRead * 0.001;
-          filterEncoder.write(0);
           tft.fillRect(350, 0, 150, CHAR_HEIGHT, RA8875_MAGENTA);
           tft.setTextColor(RA8875_WHITE);
           tft.setCursor(400, 1);
@@ -291,9 +255,9 @@ int IQOptions()
         last_RecIQGainRead = RecIQGainRead;
 
         val = ReadSelectedPushButton();
-        if (val != -1) {
+        if (val != BOGUS_PIN_READ) {                        // Any button press??
           val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
-          if (val == 0) {                  // Make a choice??
+          if (val == MENU_OPTION_SELECT) {                  // Yep. Make a choice??
             EEPROMWrite();
             break;
           }
@@ -302,8 +266,6 @@ int IQOptions()
         ShowSpectrum();
       }
       //== == == == == == == == == == == == == == == == == = Receive Phase == == == == == == == == ==
-
-      filterEncoder.write(0);
       tft.fillRect(251, 0, 250, CHAR_HEIGHT, RA8875_MAGENTA);
       tft.setTextColor(RA8875_WHITE);
       tft.setCursor(252, 1);
@@ -311,26 +273,22 @@ int IQOptions()
       tft.setCursor(400, 1);
       tft.print(IQ_phase_correction_factor);
       while (true) {
-        RecIQPhaseRead = filterEncoder.read();
         if (RecIQPhaseRead != last_RecIQPhaseRead) {
           IQ_phase_correction_factor = IQ_phase_correction_factor - RecIQPhaseRead * 0.001;
-
-          filterEncoder.write(0);
           tft.fillRect(350, 0, 150, CHAR_HEIGHT, RA8875_MAGENTA);
           tft.setTextColor(RA8875_WHITE);
           tft.setCursor(400, 1);
           tft.print(IQ_phase_correction_factor);
         }
-//        IQ_phase_correction_factorOld = IQ_phase_correction_factor;
         last_RecIQPhaseRead = RecIQPhaseRead;
 
         val = ReadSelectedPushButton();
-        if (val != -1) {
+        if (val != -1 && val < (EEPROMData.switchValues[0] + WIGGLE_ROOM)) {
           val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
           if (val == 0) {                  // Make a choice??
             IQCalFlag = 0;
-            IQ_RecCalFlag = 0; //  AFP 04-17-22 
-            SetFreq();         //  AFP 04-17-22 
+            IQ_RecCalFlag = 0; //  AFP 04-17-22
+            SetFreq();         //  AFP 04-17-22
             EEPROMWrite();
             ShowSpectrum();
             break;
@@ -343,7 +301,6 @@ int IQOptions()
       }
     case 1:                                 // Transmit
       //== == == == == == == == == == == == == == == == == = Xmit Gain == == == == == == == == ==
-      filterEncoder.write(0);
       tft.fillRect(251, 0, 250, CHAR_HEIGHT, RA8875_MAGENTA);
       tft.setTextColor(RA8875_WHITE);
       tft.setCursor(252, 1);
@@ -367,20 +324,17 @@ int IQOptions()
           modeSelectOutExR.gain(0, 1.0);
           ExciterIQData();
         }
-        XmitIQGainRead = filterEncoder.read();
         if (XmitIQGainRead != last_XmitIQGainRead) {
           IQ_Xamplitude_correction_factor = IQ_Xamplitude_correction_factor - XmitIQGainRead * 0.01;
-          filterEncoder.write(0);
           tft.fillRect(350, 0, 150, CHAR_HEIGHT, RA8875_MAGENTA);
           tft.setTextColor(RA8875_WHITE);
           tft.setCursor(400, 1);
           tft.print(IQ_Xamplitude_correction_factor);
         }
-//        IQ_Xamplitude_correction_factorOld = IQ_Xamplitude_correction_factor;
         last_XmitIQGainRead = XmitIQGainRead;
 
         val = ReadSelectedPushButton();
-        if (val != -1) {
+        if (val != -1 && val < (EEPROMData.switchValues[0] + WIGGLE_ROOM)) {
           val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
           if (val == 0) {                  // Make a choice??
             EEPROMWrite();
@@ -390,7 +344,6 @@ int IQOptions()
       }
       //== == == == == == == == == == == == == == == == == = Xmit Phase == == == == == == == == ==
 
-      filterEncoder.write(0);
       tft.fillRect(251, 0, 250, CHAR_HEIGHT, RA8875_MAGENTA);
       tft.setTextColor(RA8875_WHITE);
       tft.setCursor(252, 1);
@@ -401,7 +354,7 @@ int IQOptions()
         if (digitalRead(PTT) == LOW) {
           mute = 1;
           digitalWrite(RXTX, HIGH);
-          si5351.output_enable(SI5351_CLK2, 0);  
+          si5351.output_enable(SI5351_CLK2, 0);
           modeSelectInR.gain(0, 1.0); //Selects Ex
           modeSelectInR.gain(1, 0.0); //Selects Ex
           modeSelectInL.gain(0, 1.0); //Selects Ex
@@ -413,21 +366,18 @@ int IQOptions()
           modeSelectOutExR.gain(0, 1.0);
           ExciterIQData();
         }
-        XmitIQPhaseRead = filterEncoder.read();
         if (XmitIQPhaseRead != last_XmitIQPhaseRead) {
           IQ_Xphase_correction_factor = IQ_Xphase_correction_factor - XmitIQPhaseRead * 0.01;
 
-          filterEncoder.write(0);
           tft.fillRect(350, 0, 150, CHAR_HEIGHT, RA8875_MAGENTA);
           tft.setTextColor(RA8875_WHITE);
           tft.setCursor(400, 1);
           tft.print(IQ_Xphase_correction_factor);
         }
-//        IQ_Xphase_correction_factorOld = IQ_Xphase_correction_factor;
-        last_XmitIQPhaseRead = XmitIQPhaseRead;
+         last_XmitIQPhaseRead = XmitIQPhaseRead;
 
         val = ReadSelectedPushButton();
-        if (val != -1) {
+        if (val != -1 && val < (EEPROMData.switchValues[0] + WIGGLE_ROOM)) {
           val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
           if (val == 0) {                  // Make a choice??
             IQCalFlag = 0;
@@ -436,11 +386,9 @@ int IQOptions()
           }
         }
         IQCalFlag = 1;
-        //ShowSpectrum();
       }
     case 2:                                 //Cancel
       break;
- 
   }
   IQ_RecCalFlag = 0;
   return 1;                                 // To keep function pointer happy
@@ -456,16 +404,14 @@ int IQOptions()
 *****/
 void ProcessEqualizerChoices(int array[], char *title)
 {
-  const char *eqFreq[] = {" 200", " 250", " 315", " 400", " 500", " 630", " 800", "1000", "1250", "1600", "2000", "2500", "3150", "4000"};
-//  int yLevel[EQUALIZER_CELL_COUNT] = {100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100};
+  const char *eqFreq[] = {" 200", " 250", " 315", " 400", " 500", " 630", " 800",
+                          "1000", "1250", "1600", "2000", "2500", "3150", "4000"
+                         };
   int yLevel[EQUALIZER_CELL_COUNT];
 
   int columnIndex;
-  int direction;
   int iFreq;
   int newValue;
-  int oldPosition;
-  int newPosition;
   int xOrigin  = 50;
   int yOrigin  = 50;
   int wide     = 700;
@@ -514,54 +460,49 @@ void ProcessEqualizerChoices(int array[], char *title)
   }
 
   columnIndex = 0;                                // Get ready to set values for columns
-  oldPosition = 0;
   while (columnIndex < EQUALIZER_CELL_COUNT) {
     while (true) {
-      newValue = yLevel[columnIndex];             // Get current value
-      newPosition = fastTuneEncoder.read();              // Read menu encoder for new value
-      if (newPosition != oldPosition) {
-        direction = newPosition - oldPosition;
+      newValue = yLevel[columnIndex];                            // Get current value
+      if (filterEncoderMove != 0) {
         tft.fillRect(xOrigin  + (barWidth + 4) * columnIndex ,   // Indent to proper bar...
-                     barBottomY - newValue - 1,                                            // Start at red line
-                     barWidth,                                                             // Set bar width
-                     newValue + 1,                                                         // Draw new bar
+                     barBottomY - newValue - 1,                  // Start at red line
+                     barWidth,                                   // Set bar width
+                     newValue + 1,                               // Erase old bar
                      RA8875_BLACK);
-        if (direction > 0) {
-          newValue += PIXELS_PER_EQUALIZER_DELTA;
-        } else {
-          newValue -= PIXELS_PER_EQUALIZER_DELTA;
-        }
+        newValue += (PIXELS_PER_EQUALIZER_DELTA * filterEncoderMove); // Find new bar height. OK since filterEncoderMove equals 1 or -1       
         tft.fillRect(xOrigin  + (barWidth + 4) * columnIndex ,   // Indent to proper bar...
-                     barBottomY - newValue,                        // Start at red line
-                     barWidth,                                     // Set bar width
-                     newValue,                                     // Draw new bar
+                     barBottomY - newValue,                      // Start at red line
+                     barWidth,                                   // Set bar width
+                     newValue,                                   // Draw new bar
                      RA8875_GREEN);
         yLevel[columnIndex] = newValue;
         tft.fillRect(xOrigin + (barWidth + 4) * columnIndex + tft.getFontWidth() * 1.5 - 1, yOrigin + high + tft.getFontHeight() * 2,
-                     //                     tft.getFontWidth() * 5, CHAR_HEIGHT, RA8875_BLACK);
                      barWidth, CHAR_HEIGHT, RA8875_BLACK);
         tft.setCursor(xOrigin + (barWidth + 4) * columnIndex + tft.getFontWidth() * 1.5 , yOrigin + high + tft.getFontHeight() * 2);
         tft.print(yLevel[columnIndex]);
-        oldPosition = newPosition;
         if (newValue < DEFAULT_EQUALIZER_BAR) {                   // Repaint red center line if erased
           tft.drawFastHLine(xOrigin - 4, yOrigin + (high / 2), wide + 4, RA8875_RED);; // Clear hole in display center
         }
       }
+      filterEncoderMove = 0;
+      MyDelay(200L);
 
       val = ReadSelectedPushButton();                     // Read the ladder value
-      MyDelay(150L);
 
-      if (val != -1) {
+      if (val != -1 && val < (EEPROMData.switchValues[0] + WIGGLE_ROOM)) {
         val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
+        MyDelay(100L);
+
         tft.fillRect(xOrigin  + (barWidth + 4) * columnIndex ,   // Indent to proper bar...
                      barBottomY - newValue,                        // Start at red line
                      barWidth,                                     // Set bar width
                      newValue,                                     // Draw new bar
                      ORANGE);
-        array[columnIndex] = newValue;                     
+        array[columnIndex] = newValue;
+        filterEncoderMove = 0;
         columnIndex++;
         break;
-      }
+      }      
     }
   }
 }
@@ -580,8 +521,8 @@ int EqualizerRecOptions()
 {
   ProcessEqualizerChoices(EEPROMData.equalizerRec, (char *)"Receive Equalizer");
   EEPROMWrite();
-  RedrawDisplayScreen();  
-
+  RedrawDisplayScreen();
+  ShowName();
   return 0;
 }
 
@@ -598,7 +539,8 @@ int EqualizerXmtOptions()
 {
   ProcessEqualizerChoices(EEPROMData.equalizerXmt, (char *) "Transmit Equalizer");
   EEPROMWrite();
-  RedrawDisplayScreen();  
+  RedrawDisplayScreen();
+  ShowName();
   return 0;
 }
 
@@ -614,7 +556,7 @@ int EqualizerXmtOptions()
 int MicOptions()
 {
   const char *micChoices[] = {"On", "Off", "Cancel"};
-  
+
   micChoice = SubmenuSelect(micChoices, 3, micChoice);
   switch (micChoice) {
     case 0:                           // On
@@ -635,7 +577,7 @@ int MicOptions()
   return micChoice;
 }
 /*****
-  Purpose: Determine the frequency offset to provide more accurate frequncy tuning
+  Purpose: Determine the frequency offset to provide more accurate frequency tuning
 
   Parameter list:
     void
@@ -688,22 +630,34 @@ int FrequencyOptions()
 *****/
 int RFOptions()
 {
-  const char *rfOptions[] = {"Power level", "Gain", "Attenuation", "Cancel"};
+  const char *rfOptions[] = {"Power level", "Gain",  "Cancel"};
   int rfSet = 0;
-  int attenuator, gain, returnValue = 0;
+  int returnValue = 0;
 
-  rfSet = SubmenuSelect(rfOptions, 4, rfSet);
+
+  rfSet = SubmenuSelect(rfOptions, 3, rfSet);
+  MyDelay(150L);
+
   switch (rfSet) {
     case 0:                                 // Power
-      EEPROMData.powerLevel = GetEncoderValue(1, 20, EEPROMData.powerLevel, 1);       // Argument: min, max, start, increment
-      returnValue = EEPROMData.powerLevel;
+      transmitPowerLevel = GetEncoderValue(1, 20, EEPROMData.powerLevel, 1, (char *) "Power: ");       // Argument: min, max, start, increment
+      EEPROMData.powerLevel = transmitPowerLevel;
+      EEPROMWrite();
+      returnValue = transmitPowerLevel;
+      BandInformation();
       break;
+
     case 1:                                 // Gain
-      gain = GetEncoderValue(0, 100, 50, 5);          // Argument: min, max, start, increment
-      returnValue = gain;
+      rfGain = GetEncoderValue(0, 100, rfGain, 5, (char *) "Gain: ");          // Argument: min, max, start, increment
+      EEPROMData.rfGain = rfGain;
+      EEPROMWrite();
+      returnValue = rfGain;
       break;
-    case 2:                                 // Teenuator
-      attenuator = GetEncoderValue(0, 100, 50, 5);          // Argument: min, max, start, increment
+
+    case 2:                                 // Tenuator
+      attenuator = GetEncoderValue(0, 100, attenuator, 5, (char *) "Attenuation: ");          // Argument: min, max, start, increment
+      EEPROMData.attenuator = attenuator;
+      EEPROMWrite();
       returnValue = attenuator;
       break;
   }
@@ -777,26 +731,21 @@ void DoPaddleFlip()
 *****/
 void SetKeyerSidetone()
 {
-  static long currentTone  = 0;
-  static long lastTone     = EEPROMData.keyerSidetone;
-  long encoderToneChange;
+  int lastTone     = cwSidetone;
   int val;
-
-  filterEncoder.write(EEPROMData.keyerSidetone);
 
   tft.setFontScale( (enum RA8875tsize) 1);
 
   tft.fillRect(250, 0, 130, CHAR_HEIGHT, RA8875_GREEN);
   tft.setTextColor(RA8875_BLACK);
   tft.setCursor(252, 1);
-  tft.print(EEPROMData.keyerSidetone);
+  tft.print(cwSidetone);
+
   while (true) {
-    currentTone = filterEncoder.read();
-    if (currentTone != lastTone) {
-      encoderToneChange = (currentTone - lastTone);    // How much the number changed
-      lastTone += encoderToneChange;                  // Add change, + or -, to existing value
-      if (lastTone < 0) {
-        lastTone = 300;
+    if (filterEncoderMove != 0) {                         // encoder was changed
+      lastTone += filterEncoderMove;                      // Add change, + or -, to existing value
+      if (lastTone < MIN_TONE) {
+        lastTone = MIN_TONE;
       } else {
         if (lastTone > MAX_TONE) {
           lastTone = MAX_TONE;
@@ -809,10 +758,12 @@ void SetKeyerSidetone()
     val = ReadSelectedPushButton();                     // Read the ladder value
     MyDelay(150L);
 
-    if (val != -1) {
+    if (val != -1  && val < (EEPROMData.switchValues[0] + WIGGLE_ROOM)) {
       val = ProcessButtonPress(val);
       if (val == MENU_OPTION_SELECT) {                   // Make a choice??
+        cwSidetone = lastTone;
         EEPROMData.keyerSidetone = lastTone;
+        EEPROMWrite();
         break;
       }
     }
@@ -834,25 +785,32 @@ int VFOSelect()
   const char *VFOOptions[] = {"VFO A", "VFO B", "Split", "Cancel"};
   int toggle;
   int choice, lastChoice;
-
+ 
   choice = lastChoice = toggle = activeVFO;
 
   tft.setTextColor(RA8875_BLACK);
-  tft.fillRect(250, 0, 320, CHAR_HEIGHT, RA8875_GREEN);
+  tft.fillRect(250, 0, 300, CHAR_HEIGHT, RA8875_GREEN);
   tft.setCursor(257, 1);
   tft.print(VFOOptions[choice]);                    // Show the default (right paddle = dah
 
-  choice = SubmenuSelect(VFOOptions, 3, 0);
+  splitOn = 0;                                      // Assume no split
+  choice = SubmenuSelect(VFOOptions, 4 , 0);
   switch (choice) {
     case 0:                                     // VFO A
+      TxRxFreq = currentFreqA;
       activeVFO = VFO_A;
+      tft.fillRect(FILTER_PARAMETERS_X + 180, FILTER_PARAMETERS_Y, 150, 20, RA8875_BLACK);      // Erase split message
       break;
+
     case 1:                                     // VFO B
       TxRxFreq = currentFreqB;
       activeVFO = VFO_B;
+      tft.fillRect(FILTER_PARAMETERS_X + 180, FILTER_PARAMETERS_Y, 150, 20, RA8875_BLACK);      // Erase split message
       break;
+
     case 2:                                     // Split
       DoSplitVFO();
+      splitOn = 1;
       break;
     case 3:                                     // Cancel
       return activeVFO;
@@ -883,21 +841,25 @@ int VFOSelect()
 *****/
 int EEPROMOptions()
 {
-  const char *EEPROMOpts[] = {"Save Current", "Set Defaults", "Favorite Freq", "Cancel"};
+  const char *EEPROMOpts[] = {"Save Current", "Set Defaults", "Get Favorite", "Set Favorite", "Cancel"};
   int defaultOpt = 0;
 
-  defaultOpt = SubmenuSelect(EEPROMOpts, 4, defaultOpt);
+  defaultOpt = SubmenuSelect(EEPROMOpts, 5, defaultOpt);
   switch (defaultOpt) {
     case 0:                                   // Save current values
       EEPROMWrite();
       break;
 
     case 1:
-      EEPROMSaveDefaults();                  // Restore defaults
+      EEPROMSaveDefaults();                   // Restore defaults
       break;
 
     case 2:
-      SetFavoriteFrequencies();               // Save favorite frequency
+      GetFavoriteFrequency();               // Get a stored frequency and store in active VFO
+      break; 
+      
+    case 3:
+      SetFavoriteFrequency();               // Save current frequency to EEPROM
       break;
 
     default:
@@ -924,7 +886,7 @@ int EEPROMOptions()
   //                              403, 431, 460, 483,
   //                              248, 296, 335, 369,
   //                                5,  76, 143, 203};
-  int (*functionPtr[])() = {&CWOptions, &DisplayOptions, &SpectrumOptions, &AGCOptions,
+  int (*functionPtr[])() = {&CWOptions,  &SpectrumOptions, &AGCOptions,
                             &NROptions, &IQOptions, &EqualizerRecOptions, &EqualizerXmtOptions,
                             &MicOptions, &FrequencyOptions, &NBOptions, &RFOptions,
                             &EEPROMOptions
@@ -941,7 +903,7 @@ int EEPROMOptions()
   #define INCREMENT                   483
   #define MODE                        248
   #define FILTER                      296
-  #define NOISE_FLOOR             335
+  #define NOISE_FLOOR                 335
   #define DEMODULATION                369
   #define ZOOM                         76
   #define UNUSED_15                   143
@@ -967,17 +929,18 @@ int SubmenuSelect(const char *options[], int numberOfChoices, int defaultStart)
 
   while (true) {
     val = ReadSelectedPushButton();                     // Read the ladder value
+    MyDelay(150L);
 
-    if (val != -1) {
+    if (val != -1 && val < (EEPROMData.switchValues[0] + WIGGLE_ROOM)) {
       val = ProcessButtonPress(val);                    // Use ladder value to get menu choice
       MyDelay(150L);
 
       if (val > -1) {                                   // Valid choice?
-//        MyDelay(150L);                                    // Let button settle...
         switch (val) {
           case MENU_OPTION_SELECT:                        // They made a choice
             tft.setTextColor(RA8875_WHITE);
-            tft.fillRect(0, 0, RIGNAME_X_OFFSET - 2, CHAR_HEIGHT, RA8875_BLACK);
+//            tft.fillRect(0, 0, RIGNAME_X_OFFSET - 2, CHAR_HEIGHT, RA8875_BLACK);
+            EraseMenus();
             return encoderReturnValue;
             break;
 

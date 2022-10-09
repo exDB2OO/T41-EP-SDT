@@ -74,7 +74,6 @@ void ButtonZoom()
   ZoomFFTPrep();
   UpdateZoomField();
   DrawFrequencyBarValue();
-//  BandInformation();
   ShowBandwidth();
 }
 
@@ -108,9 +107,9 @@ void ButtonFilter()
 void ButtonDemodMode()
 {
   bands[currentBand].mode++;
-  if (bands[currentBand].mode > DEMOD_MAX)
+  if (bands[currentBand].mode > DEMOD_MAX) {
     bands[currentBand].mode = DEMOD_MIN;            // cycle thru demod modes
-
+  }
   AudioNoInterrupts();
   SetupMode(bands[currentBand].mode);
   ShowFrequency();
@@ -135,43 +134,56 @@ void ButtonMode()
 {
   if (xmtMode == CW_MODE) {
     xmtMode = SSB_MODE;
-  }
-  else if (xmtMode == SSB_MODE) {
+  } else {
     xmtMode = CW_MODE;
   }
-
+  DrawSpectrumDisplayContainer();
   BandInformation();
-
-  if (xmtMode == CW_MODE) {
+  if (xmtMode == CW_MODE) {                             // Doing CW
+    decoderFlag = CW_MODE;
+    ShowDecoderMessage();
     modeSelectOutL.gain(0, 5);
     modeSelectOutR.gain(0, 5);
     FLoCutOld = bands[currentBand].FLoCut;
     FHiCutOld = bands[currentBand].FHiCut;
     if (currentBand < 2) {
+      currentFreqA = centerFreq + NCO_FREQ;
+      ShowFrequency();
       bands[currentBand].FLoCut = -3000;
       bands[currentBand].FHiCut = -200;
-    }
-    else if (currentBand >= 2) {
+    } else {
+      currentFreqA = centerFreq + NCO_FREQ;
+      ShowFrequency();
       bands[currentBand].FLoCut = 200;
       bands[currentBand].FHiCut = 3000;
     }
-  }
-  if (xmtMode == SSB_MODE) {
+    TxRxFreq = centerFreq - CWFreqShift;
+    SetFreq();
+  } else {                                              // Doing SSB
+    decoderFlag = SSB_MODE;
     modeSelectOutL.gain(0, 1.0);
     modeSelectOutR.gain(0, 1.0);
     if (currentBand < 2) {
-      bands[currentBand].FLoCut =  FLoCutOld;
+      bands[currentBand].FLoCut = FLoCutOld;
       bands[currentBand].FHiCut = FHiCutOld;
-    }
-    else if (currentBand >= 2) {
+    } else {
       bands[currentBand].FLoCut = FLoCutOld;
       bands[currentBand].FHiCut = FHiCutOld;
     }
+    TxRxFreq = centerFreq;
+    currentFreqA = centerFreq + NCO_FREQ;
+    SetFreq();
+    ShowFrequency();
   }
+  EraseSpectrumDisplayContainer();
+  DrawSpectrumDisplayContainer();
+  UpdateDecoderField();
   ControlFilterF();
   FilterBandwidth();
   SetFreq();
   ShowFrequency();
+
+
 }
 
 /*****
@@ -216,7 +228,7 @@ void ButtonNotchFilter()
   Return value:
     int                       the display option
 *****/
-int ButtonDisplayOptions() 
+int ButtonDisplayOptions()
 {
   const char *displayChoices[] = {"Spectrum", "Waterfall", "Both", "None", "Cancel"};
   int currentDisplayMode = displayMode;
@@ -268,56 +280,55 @@ int ButtonDisplayOptions()
 int ButtonSetNoiseFloor()
 {
   int currentNoiseFloor = spectrumNoiseFloor;
-  int lastNoiseFloor;
   int val;
 
+  currentNoiseFloor = (SPECTRUM_TOP_Y + SPECTRUM_HEIGHT - 3) - spectrumNoiseFloor;      // Adjust to display
   tft.setFontScale( (enum RA8875tsize) 1);
 
-  tft.fillRect(251, 0, 300, CHAR_HEIGHT, RA8875_MAGENTA);
+  MyDelay(150L);
+  tft.fillRect(SECONDARY_MENU_X, 0, MENU_WIDTHS, CHAR_HEIGHT, RA8875_MAGENTA);   // Large second prompt moved left 30 pixels
   tft.setTextColor(RA8875_WHITE);
-  tft.setCursor(252, 1);
-  tft.print("Current floor:");
-  tft.setCursor(480, 1);
-  lastNoiseFloor = filterEncoder.read();
-  tft.print(lastNoiseFloor);
-
+  tft.setCursor(SECONDARY_MENU_X, 1);
+  tft.print("dB above X:");
+  tft.setCursor(SECONDARY_MENU_X + 200, 1);
+  tft.print(currentNoiseFloor);
   while (true) {
-    currentNoiseFloor = filterEncoder.read();
-    if (currentNoiseFloor != lastNoiseFloor) {
-      if (currentNoiseFloor - lastNoiseFloor > 0)     // How much the number changed
-        spectrumNoiseFloor--;                         // It moves up the display, or lower values for Y
-      else if (currentNoiseFloor - lastNoiseFloor < 0)
-        spectrumNoiseFloor++;                         // It moves down the display, or higher values for Y
-      if (currentNoiseFloor < SPECTRUM_BOTTOM)
-        spectrumNoiseFloor = SPECTRUM_BOTTOM;
-      else if (currentNoiseFloor > SPECTRUM_TOP_Y)
-        spectrumNoiseFloor = SPECTRUM_TOP_Y;
-      lastNoiseFloor = currentNoiseFloor;
-      tft.fillRect(470, 0, 100, CHAR_HEIGHT, RA8875_MAGENTA);
-      tft.setCursor(480, 1);
+    if (filterEncoderMove != 0) {
+      currentNoiseFloor += filterEncoderMove;                 // It moves the display
+      if (currentNoiseFloor < 0) {               // Don't exceed limits
+        currentNoiseFloor = 0;
+      } else {
+        if (currentNoiseFloor > 50) {
+          currentNoiseFloor = 50;
+        }
+      }
+      tft.fillRect(SECONDARY_MENU_X + 190, 0, 80, CHAR_HEIGHT, RA8875_MAGENTA);
+      tft.setCursor(SECONDARY_MENU_X + 200, 1);
       tft.print(currentNoiseFloor);
+      filterEncoderMove = 0;
     }
-
     val = ReadSelectedPushButton();              // Get ADC value
+    MyDelay(100L);
     val = ProcessButtonPress(val);
     if (val == MENU_OPTION_SELECT)               // If they made a choice...
     {
-      spectrumNoiseFloor -= currentNoiseFloor;
-      if (spectrumNoiseFloor < SPECTRUM_TOP_Y) {
-        spectrumNoiseFloor = SPECTRUM_TOP_Y;
+      spectrumNoiseFloor = (SPECTRUM_TOP_Y + SPECTRUM_HEIGHT - 2) - currentNoiseFloor;    // -2 to force above X axis
+      if (spectrumNoiseFloor > SPECTRUM_BOTTOM) {
+        spectrumNoiseFloor = SPECTRUM_BOTTOM;
       } else {
-        if (currentNoiseFloor > SPECTRUM_BOTTOM) {
-          spectrumNoiseFloor = SPECTRUM_BOTTOM;
-        }
+        if (spectrumNoiseFloor < SPECTRUM_BOTTOM - 50)
+          spectrumNoiseFloor = SPECTRUM_BOTTOM - 50;
       }
       EEPROMData.spectrumNoiseFloor = spectrumNoiseFloor;
       EEPROMWrite();
       break;
     }
   }
-  tft.fillRect(0, 0, 590, CHAR_HEIGHT + 4, RA8875_BLACK);
-  tft.fillRect(SPECTRUM_LEFT_X - 1, SPECTRUM_TOP_Y, MAX_WATERFALL_WIDTH + 2, SPECTRUM_HEIGHT - 1,  RA8875_BLACK);
+  EraseMenus();
+  EraseSpectrumDisplayContainer();
+  tft.setTextColor(RA8875_WHITE);
   DrawSpectrumDisplayContainer();
+  ShowSpectrumdBScale();
   ShowSpectrum();
   CenterFastTune();
   return spectrumNoiseFloor;

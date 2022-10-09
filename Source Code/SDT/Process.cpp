@@ -156,7 +156,6 @@ void ProcessIQData()
 
     if (zoom_display) {
       if (show_spectrum_flag) {
-        //ShowSpectrum();//AFP
       }
       zoom_display = 1;
       //zoom_sample_ptr = 0;
@@ -191,7 +190,6 @@ void ProcessIQData()
      *************************************************************************************************/
 
     FreqShift2();  //AFP 12-14-21
-
 
     /**********************************************************************************  AFP 12-31-20
         Decimation
@@ -457,7 +455,6 @@ void ProcessIQData()
 
       }
       //==============  acquire data on CW  ================
-
       DoCWDecoding(audioTemp); //AFP 02-02-22  pass audio value. Either 1 or 0
     }
 
@@ -479,8 +476,8 @@ void ProcessIQData()
       arm_scale_f32(float_buffer_L, 0.0, float_buffer_L, BUFFER_SIZE * N_BLOCKS);
       arm_scale_f32(float_buffer_R, 0.0, float_buffer_R, BUFFER_SIZE * N_BLOCKS);
     } else if (mute == 0) {
-      arm_scale_f32(float_buffer_L, DF * VolumeToAmplification(audio_volume), float_buffer_L, BUFFER_SIZE * N_BLOCKS);
-      arm_scale_f32(float_buffer_R, DF * VolumeToAmplification(audio_volume), float_buffer_R, BUFFER_SIZE * N_BLOCKS);
+      arm_scale_f32(float_buffer_L, DF * VolumeToAmplification(audioVolume), float_buffer_L, BUFFER_SIZE * N_BLOCKS);
+      arm_scale_f32(float_buffer_R, DF * VolumeToAmplification(audioVolume), float_buffer_R, BUFFER_SIZE * N_BLOCKS);
     }
     /**********************************************************************************  AFP 12-31-20
       CONVERT TO INTEGER AND PLAY AUDIO

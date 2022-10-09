@@ -6,7 +6,7 @@
 #define debug_alternate_NR
 #define boundary_blank 14                           //14 // for first trials very large!!!!
 #define impulse_length NB_impulse_samples           // 7 // has to be odd!!!! 7 / 3 should be enough
-#define PL             (impulse_length - 1) / 2     //6 // 3 has to be (impulse_length-1)/2 !!!!
+#define PL             (impulse_length - 1) / 2     // 6 // 3 has to be (impulse_length-1)/2 !!!!
 
 
 /*****
@@ -64,7 +64,7 @@ void AltNoiseBlanking(float* insamp, int Nsam, float* E )
   float32_t sigma2;                               //taking the variance of the inpo
   float32_t lpc_power;
   float32_t impulse_threshold;
-  
+
 #ifdef debug_alternate_NR
   static int frame_count = 0; //only used for the distortion insertion - can alter be deleted
   int dist_level         = 0; //only used for the distortion insertion - can alter be deleted
@@ -73,7 +73,7 @@ void AltNoiseBlanking(float* insamp, int Nsam, float* E )
   int nr_setting = 0;
   float32_t R[11];            // takes the autocorrelation results
   float32_t k, alfa;
-  
+
   float32_t any[order + 1];   //some internal buffers for the levinson durben algorithm
 
   float32_t Rfw[impulse_length + order]; // takes the forward predicted audio restauration
@@ -102,7 +102,7 @@ void AltNoiseBlanking(float* insamp, int Nsam, float* E )
   // 20 ..50   noise blanker active on orig. audio; threshold factor varying between 3 and 0.26
 
   nr_setting = NB_test; //(int)ts.dsp_nr_strength;
-  
+
   //*********************************from here just debug impulse / signal generation
   if ((nr_setting > 0) && (nr_setting < 10)) // we use the vocal "a" frame
   {
@@ -134,11 +134,10 @@ void AltNoiseBlanking(float* insamp, int Nsam, float* E )
       }
   }
   frame_count++;
-  if (frame_count > 20) 
+  if (frame_count > 20)
     frame_count = 0;
 
 #endif
-
   //*****************************end of debug impulse generation
 
   //  start of test timing zone
@@ -206,14 +205,11 @@ void AltNoiseBlanking(float* insamp, int Nsam, float* E )
   do {        //going through the filtered samples to find an impulse larger than the threshold
     if ((tempsamp[search_pos] > impulse_threshold) || (tempsamp[search_pos] < (-impulse_threshold)))
     {
-      impulse_positions[impulse_count] = search_pos - order; // save the impulse positions and correct it by the filter delay
+      impulse_positions[impulse_count] = search_pos - order;  // save the impulse positions and correct it by the filter delay
       impulse_count++;
-      search_pos += PL; //  set search_pos a bit away, cause we are already repairing this area later
-      //  and the next impulse should not be that close
-    }
-
+      search_pos += PL;                                       //  set search_pos a bit away, cause we are already repairing this area later
+    }                                                         //  and the next impulse should not be that close
     search_pos++;
-
   } while (( (unsigned int) search_pos < NB_FFT_SIZE - (unsigned int) boundary_blank) && ( (unsigned int) impulse_count < 20U)); // avoid upper boundary
 
   //boundary handling has to be fixed later
@@ -279,8 +275,8 @@ void AltNoiseBlanking(float* insamp, int Nsam, float* E )
 
 void CalcNotchBins()
 {
-  bin_BW =  SR[SampleRate].rate/16; // sample rate/2/8 
-                                                // calculate notch centre bin for FFT512
+  bin_BW =  SR[SampleRate].rate / 16; // sample rate/2/8
+  // calculate notch centre bin for FFT512
   notchCenterBin = roundf(notchFreq / bin_BW);
   // calculate bins  for deletion of bins in the iFFT_buffer
   // set iFFT_buffer[notch_L] to iFFT_buffer[notch_R] to zero
@@ -328,7 +324,7 @@ void AGCPrep()
     {
       case 0:                                           //agcOFF
         break;
-        
+
       case 1: //agcFrank
         hang_enable = 0;
         hang_thresh = 0.100;                            // from which level on should hang be enabled
@@ -337,33 +333,33 @@ void AGCPrep()
         agc_decay = 4000;                               // time constant decay long
         tau_fast_decay = 0.05;                          // tau_fast_decay
         tau_fast_backaverage = 0.250;                   // time constant exponential averager
-        break;      
-        
+        break;
+
       case 2:                                           //agcLONG     {"Off", "Frank", "Long", "Slow", "Medium", "Fast"};
-       // hangtime = 2.000;
+        // hangtime = 2.000;
         hangtime = 4.000;
         agc_decay = 4000;
         break;
-        
+
       case 3:                                           //agcSLOW
         //hangtime = 1.000;
-         hangtime = 4.000;
+        hangtime = 4.000;
         //agc_decay = 500;
-       agc_decay = 4000;
+        agc_decay = 4000;
         break;
-        
+
       case 4:                                           //agcMED
         hang_thresh = 1.0;
         //hangtime = 0.000;
-       // agc_decay = 250;
-         hangtime = 4.000;
+        // agc_decay = 250;
+        hangtime = 4.000;
         agc_decay = 4000;
         break;
-        
+
       case 5:                                           //agcFAST
-       // hang_thresh = 1.0;
+        // hang_thresh = 1.0;
         //hangtime = 0.000;
-         hangtime = 4.000;
+        hangtime = 4.000;
         agc_decay = 4000;
         //agc_decay = 50;
         break;
@@ -469,81 +465,81 @@ void AGC()
     switch (state)
     {
       case 0:
-          if (ring_max >= volts) {
-            volts += (ring_max - volts) * attack_mult;
+        if (ring_max >= volts) {
+          volts += (ring_max - volts) * attack_mult;
+        } else {
+          if (volts > pop_ratio * fast_backaverage) {
+            state = 1;
+            volts += (ring_max - volts) * fast_decay_mult;
           } else {
-            if (volts > pop_ratio * fast_backaverage) {
-              state = 1;
-              volts += (ring_max - volts) * fast_decay_mult;
+            if (hang_enable && (hang_backaverage > hang_level)) {
+              state = 2;
+              hang_counter = (int)(hangtime * SR[SampleRate].rate / DF);
+              decay_type = 1;
             } else {
-              if (hang_enable && (hang_backaverage > hang_level)) {
-                state = 2;
-                hang_counter = (int)(hangtime * SR[SampleRate].rate / DF);
-                decay_type = 1;
-              } else {
-                state = 3;
-                volts += (ring_max - volts) * decay_mult;
-                decay_type = 0;
-              }
+              state = 3;
+              volts += (ring_max - volts) * decay_mult;
+              decay_type = 0;
             }
           }
-          break;
+        }
+        break;
 
       case 1:
-          if (ring_max >= volts) {
-            state = 0;
-            volts += (ring_max - volts) * attack_mult;
+        if (ring_max >= volts) {
+          state = 0;
+          volts += (ring_max - volts) * attack_mult;
+        } else {
+          if (volts > save_volts) {
+            volts += (ring_max - volts) * fast_decay_mult;
           } else {
-            if (volts > save_volts) {
-              volts += (ring_max - volts) * fast_decay_mult;
+            if (hang_counter > 0) {
+              state = 2;
             } else {
-              if (hang_counter > 0) {
-                state = 2;
+              if (decay_type == 0) {
+                state = 3;
+                volts += (ring_max - volts) * decay_mult;
               } else {
-                if (decay_type == 0) {
-                  state = 3;
-                  volts += (ring_max - volts) * decay_mult;
-                } else {
-                  state = 4;
-                  volts += (ring_max - volts) * hang_decay_mult;
-                }
+                state = 4;
+                volts += (ring_max - volts) * hang_decay_mult;
               }
             }
           }
-          break;
+        }
+        break;
 
       case 2:
-          if (ring_max >= volts) {
-            state = 0;
-            save_volts = volts;
-            volts += (ring_max - volts) * attack_mult;
-          } else {
-            if (hang_counter == 0) {
-              state = 4;
-              volts += (ring_max - volts) * hang_decay_mult;
-            }
-          }
-          break;
-
-      case 3:
-          if (ring_max >= volts) {
-            state = 0;
-            save_volts = volts;
-            volts += (ring_max - volts) * attack_mult;
-          } else {
-            volts += (ring_max - volts) * decay_mult*.05;
-          }
-          break;
-     
-      case 4:
-          if (ring_max >= volts) {
-            state = 0;
-            save_volts = volts;
-            volts += (ring_max - volts) * attack_mult;
-          } else {
+        if (ring_max >= volts) {
+          state = 0;
+          save_volts = volts;
+          volts += (ring_max - volts) * attack_mult;
+        } else {
+          if (hang_counter == 0) {
+            state = 4;
             volts += (ring_max - volts) * hang_decay_mult;
           }
-          break;  
+        }
+        break;
+
+      case 3:
+        if (ring_max >= volts) {
+          state = 0;
+          save_volts = volts;
+          volts += (ring_max - volts) * attack_mult;
+        } else {
+          volts += (ring_max - volts) * decay_mult * .05;
+        }
+        break;
+
+      case 4:
+        if (ring_max >= volts) {
+          state = 0;
+          save_volts = volts;
+          volts += (ring_max - volts) * attack_mult;
+        } else {
+          volts += (ring_max - volts) * hang_decay_mult;
+        }
+        break;
     }
     if (volts < min_volts) {
       volts = min_volts; // no AGC action is taking place
@@ -551,7 +547,7 @@ void AGC()
     } else {
       agc_action = 1;                           // LED indicator for AGC action
     }
-   
+
 #ifdef USE_LOG10FAST
     mult = (out_target - slope_constant * min (0.0, log10f_fast(inv_max_input * volts))) / volts;
 #else
@@ -676,13 +672,13 @@ void AMDecodeSAM() {
   // we calculate carrier offset here and the display function is
   // then called in main loop every 100ms
   // to make this smoother, a simple lowpass/exponential averager here . . .
-  
+
   SAM_carrier             = 0.08 * (omega2 * SR[SampleRate].rate) / (DF * TPI);
   SAM_carrier             = SAM_carrier + 0.92 * SAM_lowpass;
   SAM_carrier_freq_offset = (int)SAM_carrier;
   SAM_lowpass             = SAM_carrier;
-  
-//  ShowFrequency(bands[currentBand].freq, 0);
+
+  //  ShowFrequency(bands[currentBand].freq, 0);
   ShowFrequency();
 }
 
@@ -702,13 +698,13 @@ void DecodeIQ() {
 
 /*****
   Purpose: AM_Demod_AM2
-  
+
   Parameter list:
     void
-    
+
   Return value;
     void
-    
+
   Notes:   // // E(t) = sqrtf(I*I + Q*Q) --> highpass IIR 1st order for DC removal --> lowpass IIR 2nd order
     Calc. magnitude of Signals and applies DC and low freq filtering using IIR filter.  Works well
 *****/
@@ -717,7 +713,7 @@ void AMDemodAM2() {
   for (unsigned i = 0; i < FFT_length / 2; i++) { //
     audiotmp = sqrtf(iFFT_buffer[FFT_length + (i * 2)] * iFFT_buffer[FFT_length + (i * 2)]
                      + iFFT_buffer[FFT_length + (i * 2) + 1] * iFFT_buffer[FFT_length + (i * 2) + 1]);
-                                                                                                        // DC removal filter -------
+    // DC removal filter -------
     w = audiotmp + wold * 0.9999f; // yes, I want a superb bass response ;-)
     float_buffer_L[i] = w - wold;
 
@@ -729,20 +725,19 @@ void AMDemodAM2() {
 
 /*****
   Purpose: Allow user to set the mic compression level between 0.0 and 1.0
-  
+
   Parameter list:
     void
-    
+
   Return value;
     void
-    
+
   Notes:   // // E(t) = sqrtf(I*I + Q*Q) --> highpass IIR 1st order for DC removal --> lowpass IIR 2nd order
     Calc. magnitude of Signals and applies DC and low freq filtering using IIR filter.  Works well
 *****/
 void SetCompressionLevel()
 {
   int val;
-  static float lastCompression;
   float currentCompression = micCompression;
 
   tft.setFontScale( (enum RA8875tsize) 1);
@@ -750,37 +745,37 @@ void SetCompressionLevel()
   tft.fillRect(251, 0, 270, CHAR_HEIGHT, RA8875_MAGENTA);
   tft.setTextColor(RA8875_WHITE);
   tft.setCursor(252, 1);
-  tft.print("Compression:");
+  tft.print("Compression:       ");
   tft.setCursor(450, 1);
   tft.print(micCompression);
 
-  filterEncoder.write(micCompression * 100);
   while (true) {
-    val = filterEncoder.read();
-    currentCompression += ((float) val) * 0.05;
-    if (currentCompression != lastCompression) {
-
+    if (filterEncoderMove != 0) {
+      currentCompression += ((float) filterEncoderMove * 0.05);
       if (currentCompression < 0.0)
         currentCompression = 0.0;
       else if (currentCompression > 1.0)                 // 100% max
         currentCompression = 1.0;
 
-      filterEncoder.write(currentCompression);
-
-      tft.fillRect(450, 0, 50, CHAR_HEIGHT, RA8875_MAGENTA);
+      tft.fillRect(450, 0, 80, CHAR_HEIGHT, RA8875_MAGENTA);
       tft.setCursor(450, 1);
       tft.print(currentCompression);
     }
+    filterEncoderMove = 0;
+    MyDelay(200L);
 
     val = ReadSelectedPushButton();                                  // Read pin that controls all switches
-    val = ProcessButtonPress(val);
-    MyDelay(150L);
+    if (val != -1 && val < (EEPROMData.switchValues[0] + WIGGLE_ROOM)) {
+      val = ProcessButtonPress(val);
+      MyDelay(100L);
 
-    if (val == MENU_OPTION_SELECT) {                             // Make a choice??
-      lastCompression = micCompression = currentCompression;
-      EEPROMData.micCompression = micCompression;
-      UpdateCompressionField();   
-      break;
+      if (val == MENU_OPTION_SELECT) {                             // Make a choice??
+        micCompression = currentCompression;
+        EEPROMData.micCompression = micCompression;
+        EEPROMWrite();
+        UpdateCompressionField();
+        break;
+      }
     }
   }
 }

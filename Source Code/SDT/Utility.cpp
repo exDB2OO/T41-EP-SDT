@@ -332,7 +332,7 @@ void Calculatedbm()
 #ifdef USE_LOG10FAST
     switch (display_dbm) {
       case DISPLAY_S_METER_DBM:
-        dbm = dbm_calibration + bands[currentBand].gainCorrection + (float32_t)RF_attenuation +
+        dbm = dbm_calibration + bands[currentBand].gainCorrection + (float32_t)attenuator +
               slope * log10f_fast(sum_db) + cons - (float32_t)bands[currentBand].RFgain * 1.5;
         dbmhz = 0;
         break;
@@ -344,7 +344,7 @@ void Calculatedbm()
 #else
     switch (display_dbm) {
       case DISPLAY_S_METER_DBM:
-        dbm = dbm_calibration + bands[currentBand].gainCorrection + (float32_t)RF_attenuation +
+        dbm = dbm_calibration + bands[currentBand].gainCorrection + (float32_t)attenuator +
               slope * log10f(sum_db) + cons - (float32_t)bands[currentBand].RFgain * 1.5;
         dbmhz = 0;
         break;
@@ -360,22 +360,22 @@ void Calculatedbm()
 #ifdef USE_LOG10FAST
     switch (display_dbm) {
       case DISPLAY_S_METER_DBM:
-        dbm = dbm_calibration + (float32_t)RF_attenuation + slope * log10f_fast (sum_db) + cons - (float32_t)bands[currentBand].RFgain * 1.5;
+        dbm = dbm_calibration + (float32_t)attenuator + slope * log10f_fast (sum_db) + cons - (float32_t)bands[currentBand].RFgain * 1.5;
         dbmhz = 0;
         break;
       case DISPLAY_S_METER_DBMHZ:
-        dbmhz = (float32_t)RF_attenuation +  - (float32_t)bands[currentBand].RFgain * 1.5 + slope * log10f_fast (sum_db) -  10 * log10f_fast ((float32_t)(((int)Ubin - (int)Lbin) * bin_BW)) + cons;
+        dbmhz = (float32_t)attenuator +  - (float32_t)bands[currentBand].RFgain * 1.5 + slope * log10f_fast (sum_db) -  10 * log10f_fast ((float32_t)(((int)Ubin - (int)Lbin) * bin_BW)) + cons;
         dbm = 0;
         break;
     }
 #else
     switch (display_dbm) {
       case DISPLAY_S_METER_DBM:
-        dbm = dbm_calibration + (float32_t)RF_attenuation + slope * log10f (sum_db) + cons - (float32_t)bands[currentBand].RFgain * 1.5;
+        dbm = dbm_calibration + (float32_t)attenuator + slope * log10f (sum_db) + cons - (float32_t)bands[currentBand].RFgain * 1.5;
         dbmhz = 0;
         break;
       case DISPLAY_S_METER_DBMHZ:
-        dbmhz = (float32_t)RF_attenuation +  - (float32_t)bands[currentBand].RFgain * 1.5 + slope * log10f (sum_db) -  10 * log10f ((float32_t)(((int)Ubin - (int)Lbin) * bin_BW)) + cons;
+        dbmhz = (float32_t)attenuator +  - (float32_t)bands[currentBand].RFgain * 1.5 + slope * log10f (sum_db) -  10 * log10f ((float32_t)(((int)Ubin - (int)Lbin) * bin_BW)) + cons;
         dbm = 0;
         break;
     }
@@ -728,7 +728,7 @@ void SaveAnalogSwitchValues()
       tft.setCursor(650, 20 + index * 25);
       tft.print(minVal);
       EEPROMData.switchValues[index] = minVal;
-      switchThreshholds[index] = minVal;
+//      switchThreshholds[index] = minVal;
       index++;
       MyDelay(100L);
     }
@@ -772,11 +772,10 @@ void DisplayClock()
   }
   strcat(timeBuffer, temp);
 
-
   tft.setFontScale( (enum RA8875tsize) 1);
 
-  tft.fillRect(TIME_X, TIME_Y, XPIXELS - TIME_X - 1, CHAR_HEIGHT, RA8875_BLACK);
-  tft.setCursor(TIME_X, TIME_Y);
+  tft.fillRect(TIME_X - 20, TIME_Y, XPIXELS - TIME_X - 1, CHAR_HEIGHT, RA8875_BLACK);
+  tft.setCursor(TIME_X - 20, TIME_Y);
   tft.setTextColor(RA8875_WHITE);
   tft.print(timeBuffer);
 }                                                   // end function displayTime

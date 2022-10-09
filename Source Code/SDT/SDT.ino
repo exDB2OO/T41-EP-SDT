@@ -6,21 +6,59 @@
   (c) Frank Dziock, DD4WH, 2020_05_8
   "TEENSY CONVOLUTION SDR" substantially modified by Jack Purdum, W8TEE, and Al Peter, AC8GY
 
-  This software is made available under the Freeware license agreement, which prevents the use of
-  the software for commercial use. If any commercial use of this software is planned, the interested
-  parties must first get written approval from Jack Purdum, W8TEE, and Al Peter, AC8GY. User for non-
-  commerical use is acceptable.
+  This software is made available under the GNU GPL v3 license agreement. If commercial use of this
+  software is planned, we would appreciate it if the interested parties get written approval
+  from Jack Purdum, W8TEE, and Al Peter, AC8GY.
 
   Any and all other commercial uses, written or implied, are forbidden without written permission from
   Dr. Jack Purdum, W8TEE, and Al Peter, AC8GY.
 
+  V015 Aug, 06, 2022  Jack Purdum (W8TEE): Made the following changes (most "runaway" problems caused by moving to ISR's):
+    Fixed: Changed encoders from polling to interrupt-driven
+    Fixed: Spectrum set now saved to EEPROM
+    Fixed: frequency filter overlay (i.e., the "blue box") so it doesn't "jump" when Fine Tune used
+    Fixed: Opaque overlay after band changed
+    Fixed: Kim noise reduction has "runaway" (where the code auto-incremented the value)
+    Fixed: "AGC" removed from Info Window when turned off: WHITE = Slow, ORANGE = Medium, GREEN = FAST, RED = AGC in action
+    Fixed: Part of "T41-EP" in upper-right corner partially erased when doing certain screen updates.
+    Fixed: Text under VFO A partially erased on certain screen updates.
+    Fixed: Switching modes caused filter overlay to disappear.
+    Fixed: Receiver equalization caused "runaway"
+    Fixed: transmit equalization caused "runaway"
+    Fixed: switching to VFO B and tuning messed up VFO A frequency readout.
+    Fixed: Audio post-processing caused "runaway"
+    Fixed: RF Gain caused "runaway"
+    Fixed: Power setting caused "runaway"
+    Fixed: Mic compression caused "runaway"
+    Fixed: Mode switch
+    Fixed: Pushing Select when no menu item selected; issue error message
+    Fixed: EEPROM SetFavoriteFrequency() and GetFavoriteFrequency()
+    Fixed: No longer need to remove spectrum or waterfall displays; removed.
+    Not fixed yet: Unresponsive S Meter
+    Not fixed yet: IQ Manual setting
+    Not fixed yet: Other undiscovered bugs...and there will be some!
+  FLASH: code:182384, data:95848, headers:8484   free for files:7839748
+   RAM1: variables:165280, code:179112, padding:17496   free for local variables:162400
+   RAM2: variables:425824  free for malloc/new:98464
+
+  V012 Jul, 11, 2022  Jack Purdum (W8TEE): Removed dead code, unused variables, etc. Also added Split VFO code
+                       and removed non-macro Serial.print() statements
+  FLASH: code:181840, data:96824, headers:9076   free for files:7838724
+   RAM1: variables:166304, code:178568, padding:18040   free for local variables:161376
+   RAM2: variables:425824  free for malloc/new:98464
+
+  V011 June, 08, 2022  Jack Purdum (W8TEE): Changed all encoders from polling to interrupt.
+    FLASH: code:192720, data:82940, headers:9008   free for files:7841796
+      RAM1: variables:166592, code:189448, padding:7160   free for local variables:161088
+      RAM2: variables:425824  free for malloc/new:98464
+
   V010 June, 03, 2022  Jack Purdum (W8TEE): CW sending section still incomplete
-  FLASH: code:193424, data:82860, headers:8384   free for files:7841796
-   RAM1: variables:162528, code:190152, padding:6456   free for local variables:165152
-   RAM2: variables:429920  free for malloc/new:94368
+    FLASH: code:193424, data:82860, headers:8384   free for files:7841796
+      RAM1: variables:162528, code:190152, padding:6456   free for local variables:165152
+      RAM2: variables:429920  free for malloc/new:94368
 *********************************************************************************************/
 
-                          // setup() and loop() at the bottom of this file
+// setup() and loop() at the bottom of this file
 
 #ifndef BEENHERE
 #include "SDT.h"
@@ -93,10 +131,13 @@ Bounce demodSwitch        = Bounce(CHANGE_DEMOD,     50);
 Bounce zoomSwitch         = Bounce(CHANGE_ZOOM,      50);
 Bounce cursorSwitch       = Bounce(SET_FREQ_CURSOR,  50);
 
-Rotary tuneEncoder = Rotary(TUNE_ENCODER_A,  TUNE_ENCODER_B);           //(16, 17)
-Encoder fastTuneEncoder(ENCODER3_ENCODER_A,  ENCODER3_ENCODER_B);       //( 4,  5)
-Encoder filterEncoder(FILTER_ENCODER_A,      FILTER_ENCODER_B);         //(14, 15)
-Encoder volumeEncoder(VOLUME_ENCODER_A,      VOLUME_ENCODER_B);         //( 2,  3)
+Rotary volumeEncoder        = Rotary(VOLUME_ENCODER_A,   VOLUME_ENCODER_B);   //( 2,  3)
+Rotary tuneEncoder          = Rotary(TUNE_ENCODER_A,     TUNE_ENCODER_B);     //(16, 17)
+Rotary filterEncoder        = Rotary(FILTER_ENCODER_A,   FILTER_ENCODER_B);   //(15, 14)
+Rotary fineTuneEncoder      = Rotary(ENCODER3_ENCODER_A, ENCODER3_ENCODER_B); //( 4,  5)
+//Encoder fineTuneEncoder(ENCODER3_ENCODER_A,  ENCODER3_ENCODER_B);    //( 4,  5)
+//Encoder filterEncoder(FILTER_ENCODER_A,      FILTER_ENCODER_B);    //(14, 15)
+//Encoder volumeEncoder(VOLUME_ENCODER_A,      VOLUME_ENCODER_B);    //( 2,  3)
 
 Metro ms_500          = Metro(500);                             // Set up a Metro
 Metro encoder_check   = Metro(100);                             // Set up a Metro
@@ -118,10 +159,10 @@ SPISettings settingsA(70000000UL, MSBFIRST, SPI_MODE1);
  **********************************************************************************/
 
 //uint8_t SampleRate = 192000;
+#define IIR_ORDER                 8
+#define IIR_NUMSTAGES             (IIR_ORDER / 2)
+int NumExBlocks                   = 8;
 const uint32_t N_B_EX             = 16;
-#define IIR_ORDER 8
-#define IIR_NUMSTAGES (IIR_ORDER / 2)
-int NumExBlocks = 8;
 
 //Setup for EQ filters
 float32_t EQ_Band1_state[IIR_NUMSTAGES * 2]  = {0, 0, 0, 0, 0, 0, 0, 0};//declare and zero biquad state variables
@@ -339,11 +380,12 @@ dispSc displayScale[] =  //r *dbText,dBScale, pixelsPerDB, baseOffset, offsetInc
 
 //======================================== Global variables declarations for Quad Oscillator 2 ===============================================
 //  AFP 12-11-21
-float32_t NCO_FREQ; // AFP 04-16-22
+//float32_t NCO_FREQ; // AFP 04-16-22
+long NCO_FREQ;
 //float32_t NCO_FREQ = AUDIO_SAMPLE_RATE_EXACT /8;  //LSB
 
-double stepFT = 50.0;
-double stepFT2 = 50.0;
+unsigned long stepFT  = 50UL;
+unsigned long stepFT2 = 50UL;
 int stepFTOld = 0;
 float32_t NCO_INC; // AFP 04-16-22
 double OSC_COS;
@@ -391,15 +433,16 @@ float32_t float_Corr_BufferR[511];   //AFP 02-06-22
 float32_t float_Corr_BufferL[511];   //AFP 02-06-22
 long tempSigTime = 0;
 
-int audioTemp  = 0;
-int audioTempPrevious  = 0;
-float sigStart = 0.0;
-float sigDuration = 0.0;
-float gapStartData = 0.0;
-float gapDurationData = 0.0;
-int audioValuePrevious = 0;
-int CWOnState;
+int audioTemp           = 0;
+int audioTempPrevious   = 0;
+float sigStart          = 0.0;
+float sigDuration       = 0.0;
+float gapStartData      = 0.0;
+float gapDurationData   = 0.0;
 float goertzelMagnitude;
+
+int audioValuePrevious  = 0;
+int CWOnState;
 
 bool gEEPROM_current                      = false;            //mdrhere does the data in EEPROM match the current structure contents
 bool NR_gain_smooth_enable                = false;
@@ -407,6 +450,7 @@ bool NR_long_tone_reset                   = true;
 bool NR_long_tone_enable                  = false;
 bool omitOutputFlag                       = false;
 bool timeflag                             = 0;
+bool volumeChangeFlag                     = false;
 
 char letterTable[] = {                 // Morse coding: dit = 0, dah = 1
   0b101,              // A                first 1 is the sentinel marker
@@ -470,10 +514,7 @@ char punctuationTable[] = {
 };
 int ASCIIForPunctuation[] = {33, 34, 36, 39, 41, 44, 45, 46, 47, 58, 59, 63, 95};  // Indexes into code
 
-int kTemp;
-
 long startTime = 0;
-
 
 char theversion[10];
 char decodeBuffer[30];                   // The buffer for holding the decoded characters
@@ -483,7 +524,7 @@ char *bigMorseCodeTree  = (char *) "-EISH5--4--V---3--UF--------?-2--ARL--------
 //         10        20        30        40        50        60        70        80        90       100       110       120
 
 const char *tune_text       = "Fast Tune";
-const char *topMenus[]      = {"CW Options",  "Display Choices", "Spectrum Set",    "AGC",        "NR Set",
+const char *topMenus[]      = {"CW Options", "Spectrum Set",    "AGC",        "NR Set",
                                "IQ Manual",   "EQ Rec Set",      "EQ Xmt Set",      "Mic Comp",   "Freq Cal",
                                "Noise Floor", "RF Set",          "Audio Post Proc", "VFO Select", "EEPROM",
                                "Unused 1",    "Unused 2"
@@ -507,13 +548,13 @@ int8_t first_block                        = 1;
 
 int8_t Menu2                              = MENU_F_LO_CUT;
 int8_t mesz                               = -1;
+int8_t menuStatus                         = NO_MENUS_ACTIVE;
 int8_t mesz_old                           = 0;
 int8_t NB_taps                            = 10;
 int8_t NB_impulse_samples                 = 7;
 int8_t NR_first_block                     = 1;
 int8_t pos_x_date                         = 14;
 int8_t pos_y_date                         = 68;
-int8_t RF_attenuation                     = 0;
 int8_t xmtMode                            = SSB_MODE;      // 0 = SSB, 1 = CW
 
 uint8_t agc_action                        = 0;
@@ -590,15 +631,13 @@ uint16_t base_y = spectrum_y + spectrum_WF_height + 4;
 
 int16_t activeVFO;
 int16_t currentMode;
-int16_t displayMode                       = BOTH_DISPLAYS;  // Show Spectrum and waterfall
-int16_t DMAMEM pixelnew[SPECTRUM_RES];
-int16_t DMAMEM pixelold[SPECTRUM_RES];
-int16_t DMAMEM pixelnew2[MAX_WATERFALL_WIDTH + 1];//AFP
-int16_t DMAMEM pixelold2[MAX_WATERFALL_WIDTH];
-int16_t EqualizerRecValues[5];
-int16_t EqualizerXmtValues[5];
+int16_t displayMode                       = BOTH_DISPLAYS;          // Show Spectrum and waterfall
+int16_t pixelnew[SPECTRUM_RES];
+int16_t pixelold[SPECTRUM_RES];
+int16_t pixelnew2[MAX_WATERFALL_WIDTH + 1];                         //AFP
+int16_t pixelold2[MAX_WATERFALL_WIDTH];
 int16_t notch_L[2]                        = {156, 180};
-int16_t  fineEncoderRead;
+int16_t fineEncoderRead;
 int16_t notch_R[2]                        = {166, 190};
 int16_t notch_pixel_L[2]                  = {1, 2};
 int16_t notch_pixel_R[2]                  = {2, 3};
@@ -625,11 +664,14 @@ uint16_t autotune_counter;
 uint16_t barGraphUpdate                   = 0;
 uint16_t currentScale                     = 1;        // 20 dB/division
 
-//===== New histogram stuff  AFO 02-20-22 ===
-int endDitFlag = 0;
+//===== New histogram stuff ===
+int endDitFlag                            = 0;
+volatile int filterEncoderMove            = 0;
+volatile long fineTuneEncoderMove         = 0L;
+
 int topDitIndex;
 int topDitIndexOld;
-int endGapFlag = 0;
+int endGapFlag                            = 0;
 int topGapIndex;
 int topGapIndexOld;
 
@@ -662,6 +704,8 @@ float aveAtomGapLength = 40;
 float thresholdGapGeometricMean;
 float thresholdGapArithmeticMean;
 long CWFreqShift;
+long filter_pos  = 0;
+long last_filter_pos  = 0;
 // ============ end new stuff =======
 
 
@@ -699,9 +743,8 @@ const uint16_t n_dec2_taps                = (1 + (uint16_t) (n_att / (22.0 * (n_
 
 int resultOldFactor;
 float incrFactor;
-int audio_volumeOld2 = 50;
 int mute = 0;
-int (*functionPtr[])()                    = {&CWOptions, &ButtonDisplayOptions, &SpectrumOptions, &AGCOptions,
+int (*functionPtr[])()                    = {&CWOptions, &SpectrumOptions, &AGCOptions,
                                              &NROptions, &IQOptions, &EqualizerRecOptions, &EqualizerXmtOptions,
                                              &MicOptions, &FrequencyOptions, &ButtonSetNoiseFloor, &RFOptions,
                                              &PostProcessorAudio, &VFOSelect, &EEPROMOptions
@@ -717,15 +760,17 @@ int ANR_in_idx                            = 0;
 int ANR_mask                              = ANR_dline_size - 1;
 int ANR_position                          = 0;
 int ANR_taps                              = 64;
+int attenuator;
 int attack_buffsize;
-int audio_volume                          = 50;
+int audioVolume                           = 50;
+int audioVolumeOld2                       = 50;
 int audioYPixel[1024];
 int audioPostProcessorCells[AUDIO_POST_PROCESSOR_BANDS];
 
 int bandswitchPins[]                      = {30,   // 80M
                                              31,   // 40M
                                              28,   // 20M
-                                             0,   // 17M
+                                             0,    // 17M
                                              29,   // 15M
                                              0,   // 12M
                                              0    // 10M
@@ -769,22 +814,23 @@ int kDisplay = 0; //AFP
 int IQChoice;
 int LMS_nr_strength;
 int LP_F_help                             = 3500;
+int mainTuneEncoder;
 int micChoice;
 int minPinRead = 1024;
-int oldCursorPosition                     = 256;
-int operatingMode;
 int NR_Index = 0;
 int n_L;
 int n_R;
 int n_tau;
 int NBChoice;
 int nrOptionSelect;
-int newCursorPosition =                     256;
+int newCursorPosition                     = 0;
 int NR_Choice                             = 0;
 int NR_Filter_Value                       = -1;
 int NR_KIM_K_int                          = 1000;
 int NR_VAD_delay                          =  0;
 int NR_VAD_duration                       = 0 ;
+int oldCursorPosition                     = 256;
+int operatingMode;
 int old_demod_mode                        = -99;
 int oldnotchF                             = 10000;
 int out_index                             = -1;
@@ -794,20 +840,25 @@ int pmode                                 = 1;
 int pos_centre_f                          = 64;
 int pos_x_frequency                       = 12;
 int pos_y_smeter                          = (spectrum_y - 12);
+int rfGain;
 int SAM_AM_Choice;
 int spectrumNoiseFloor                    = SPECTRUM_NOISE_FLOOR;
+int splitOn;
 int secondaryMenuChoiceMade;
 int smeterLength;
 
 int SSB_AUTOTUNE_counter;
 int switchFilterSideband                  = 0;
 
-int switchThreshholds[]                   = {888, 827, 772, 730,
+/*
+  int switchThreshholds[]                   = {888, 827, 772, 730,
                                              673, 603, 552, 505,
                                              448, 387, 318, 268,
                                              12,  202, 150, 73
                                             };
+*/
 int termCursorXpos                        = 0;
+int transmitPowerLevel;
 int x2 = 0;                                                             //AFP
 int zeta_help                             = 65;
 int zoom_sample_ptr                       = 0;
@@ -867,12 +918,13 @@ long averageDah;
 long calibration_constant                 = 10000L;
 
 long currentFreq;
-long centerFreq                           = 7150000L;
+long centerFreq                           = 7047700L;
 long CWRecFreq;     //  = TxRxFreq +/- 700Hz
-long currentFreqA                         = 7150000;  //Initial VFOA center freq
+long currentFreqA                         = 7047700L;  //Initial VFOA center freq
 long currentFreqB                         = 7030000;  //Initial VFOB center freq
 long currentWPM                           = 15L;
 long frequencyCorrection;
+long incrementValues[]                    = {10, 50, 100, 250, 1000, 10000};
 long lastWPM;
 long int n_clear;
 long notchPosOld;
@@ -896,7 +948,7 @@ ulong samp_ptr;
 uint64_t output12khz;
 
 //unsigned long long calibration_factor     = 1000000000ULL;
-unsigned long long calibration_factor     = 999845000ULL;   // AFP 12-30-21
+unsigned long long calibration_factor     = 999920000ULL;   // AFP 12-30-21
 unsigned long long hilfsf                 = 1000000000ULL;
 unsigned long long hilfsfEx               = 1000000000ULL;
 float dcfRefLevel;
@@ -935,7 +987,7 @@ float32_t audioSpectBuffer[1024];
 float32_t b[3 * SAM_PLL_HILBERT_STAGES + 3];
 float32_t bass                            = 0.0;
 float32_t farnsworthValue;
-float32_t micCompression                  = 0.7;
+float32_t micCompression;
 float32_t midbass                         = 0.0;
 float32_t mid                             = 0.0;
 float32_t midtreble                       = 0.0;
@@ -1241,7 +1293,6 @@ PROGMEM
 *****/
 void Codec_gain()
 {
-
   static uint32_t timer = 0;
   timer ++;
   if (timer > 10000) timer = 10000;
@@ -1425,7 +1476,9 @@ int SetI2SFreq(int freq) {
   n2 = 1 + (24000000 * 27) / (freq * 256 * n1);
   if (n2 > 63) {
     // n2 must fit into a 6-bit field
+#ifdef DEBUG
     Serial.printf("ERROR: n2 exceeds 63 - %d\n", n2);
+#endif
     return 0;
   }
   C = ((double)freq * 256 * n1 * n2) / 24000000;
@@ -1448,10 +1501,10 @@ int SetI2SFreq(int freq) {
   Purpose: to cause a delay in program execution
 
   Paramter list:
-  unsigned long millisWait    // the number of millseconds to wait
+    unsigned long millisWait    // the number of millseconds to wait
 
   Return value:
-  void
+    void
 *****/
 void MyDelay(unsigned long millisWait)
 {
@@ -1754,7 +1807,7 @@ void RefreshMainDisplay(int displayMode)
       FilterBandwidth();
       DrawSMeterContainer();
       DrawAudioSpectContainer();
-      SetAttenuator(RF_attenuation);
+      SetAttenuator(attenuator);
       SetFreq();
       AGCPrep();
       EncoderVolume();
@@ -1763,10 +1816,9 @@ void RefreshMainDisplay(int displayMode)
       break;
     case NOISE_DISPLAY:
       break;
-
   }
-
 }
+
 //===============================================================================================================================
 //===============================================================================================================================
 //==========================  Setup ================================
@@ -1782,12 +1834,13 @@ PROGMEM
 *****/
 void setup()
 {
-
-  Serial.begin(115200);
-  //while (!Serial)
-  //  ;
+  //  Serial.begin(115200);
+  Serial.begin(9600);
+  //  while (!Serial)
+  //    ;
   AudioMemory(400);
   MyDelay(100L);
+  //  set_arm_clock(T4_CPU_FREQUENCY);
 
   setSyncProvider(getTeensy3Time);            // get TIME from real time clock with 3V backup battery
   setTime(now());
@@ -1798,8 +1851,8 @@ void setup()
   sgtl5000_1.enable();
   AudioMemory(400); //
   sgtl5000_1.inputSelect(AUDIO_INPUT_MIC);
-
-  sgtl5000_1.micGain(60);
+  //sgtl5000_1.inputSelect(AUDIO_INPUT_LINEIN);
+  sgtl5000_1.micGain(20);
   sgtl5000_1.lineInLevel(0);
   sgtl5000_1.lineOutLevel(20);
 
@@ -1814,15 +1867,18 @@ void setup()
   pinMode(FILTERPIN80M,     OUTPUT);
   pinMode(RXTX,             OUTPUT);
   pinMode(MUTE,             OUTPUT);
-  digitalWrite(MUTE,        HIGH);
+  digitalWrite(MUTE,        LOW);
   pinMode(PTT,              INPUT_PULLUP);
   pinMode(BUSY_ANALOG_PIN,  INPUT);
+
+  pinMode(FILTER_ENCODER_A, INPUT);
+  pinMode(FILTER_ENCODER_B, INPUT);
 
   pinMode(OPTO_OUTPUT,      OUTPUT);
   pinMode(KEYER_DIT_INPUT_TIP,  INPUT_PULLUP);
   pinMode(KEYER_DAH_INPUT_RING, INPUT_PULLUP);
-  //  attachInterrupt(digitalPinToInterrupt(KEYER_DIT_INPUT_TIP),  Dit, CHANGE);
-  //  attachInterrupt(digitalPinToInterrupt(KEYER_DAH_INPUT_RING), Dah, CHANGE);
+  digitalWrite(KEYER_DIT_INPUT_TIP,  HIGH);
+  digitalWrite(KEYER_DAH_INPUT_RING, HIGH);
 
   pinMode(TFT_MOSI,         OUTPUT);
   digitalWrite(TFT_MOSI,    HIGH);
@@ -1830,7 +1886,7 @@ void setup()
   digitalWrite(TFT_SCLK,    HIGH);
   pinMode(TFT_CS,           OUTPUT);
   digitalWrite(TFT_CS,      HIGH);
-  delay(1);
+  MyDelay(1);
 
   arm_fir_init_f32(&FIR_Hilbert_L, 100, FIR_Hilbert_coeffs_45, FIR_Hilbert_state_L, 256);  //AFP01-16-22
   arm_fir_init_f32(&FIR_Hilbert_R, 100, FIR_Hilbert_coeffs_neg45, FIR_Hilbert_state_R, 256);
@@ -1864,23 +1920,39 @@ void setup()
   EQBand13GaindB = 0; //3150
   EQBand14GaindB = 0; //4000
 
-  //tft.begin(50000000);
   uint32_t iospeed_display                  = IOMUXC_PAD_DSE(3) | IOMUXC_PAD_SPEED(1);
   *(digital_pin_to_info_PGM + 13)->pad      = iospeed_display;                            //clk
   *(digital_pin_to_info_PGM + 11)->pad      = iospeed_display;                            //MOSI
   *(digital_pin_to_info_PGM + TFT_CS)->pad  = iospeed_display;
 
   tuneEncoder.begin(true);
+  //    attachInterrupt(digitalPinToInterrupt(TUNE_ENCODER_A),     MainTune,   CHANGE);
+  //    attachInterrupt(digitalPinToInterrupt(TUNE_ENCODER_B),     MainTune,   CHANGE);
+  volumeEncoder.begin(true);
+  attachInterrupt(digitalPinToInterrupt(VOLUME_ENCODER_A),   EncoderVolume,   CHANGE);
+  attachInterrupt(digitalPinToInterrupt(VOLUME_ENCODER_B),   EncoderVolume,   CHANGE);
+  filterEncoder.begin(true);
+  attachInterrupt(digitalPinToInterrupt(FILTER_ENCODER_A),   EncoderFilter,   CHANGE);
+  attachInterrupt(digitalPinToInterrupt(FILTER_ENCODER_B),   EncoderFilter,   CHANGE);
+  fineTuneEncoder.begin(true);
+  attachInterrupt(digitalPinToInterrupt(ENCODER3_ENCODER_A), EncoderFineTune, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ENCODER3_ENCODER_B), EncoderFineTune, CHANGE);
 
-  tft.begin(RA8875_800x480);              // Can do graphics now
+  //  attachInterrupt(digitalPinToInterrupt(KEYER_DIT_INPUT_TIP),  Dit,           CHANGE);
+  //  attachInterrupt(digitalPinToInterrupt(KEYER_DAH_INPUT_RING), Dah,           CHANGE);
+
+  tft.begin(RA8875_800x480, 8, 20000000UL, 4000000UL);              // parameter list from library code
+
   tft.setRotation(0);
 
-  // Setup for scrolling attributes. Part of  initSpectrum_RA8875() call written by Mike Lewis
-  tft.useLayers(1);                 //mainly used to turn on layers! //AFP 03-27-22 Layers
+  // Setup for scrolling attributes. Part of initSpectrum_RA8875() call written by Mike Lewis
+  tft.useLayers(true);                    //mainly used to turn on layers! //AFP 03-27-22 Layers
   tft.layerEffect(OR);
+  tft.clearMemory();
   tft.writeTo(L2);
   tft.clearMemory();
   tft.writeTo(L1);
+
   Splash();
 
   spectrum_x        = 10;
@@ -1894,79 +1966,85 @@ void setup()
   Q_in_R.begin();
 
   MyDelay(100L);
+
   InitializeDataArrays();
 
   displayMode = BOTH_DISPLAYS;
 
-  // ==============================================  Intial set up of EEPROM data ===============
-  //  EEPROMSaveDefaults();                           // uncomment this line first time running new Teensy to set up the EEPROM
 
+  // ========================  Initial set up of EEPROM data ===============
 
-  if (EEPROMData.version_of_settings[0] != 'V') {       // EEPROM has not been set
-    SaveAnalogSwitchValues();                           // Call this function to reset switch matrix values
+  EEPROMRead();                                     // Read what's stored in EEPROM...junk or not?
+
+  if (EEPROMData.version_of_settings[0] != 'V') {   // EEPROM has not been set
+    EEPROMSaveDefaults();                           // Use default values so things will work
+    SaveAnalogSwitchValues();                       // Call to reset switch matrix values
   }
 
-  EEPROMRead();                                     // Read stored settings
+#ifdef DEBUG
+  EEPROMShow();
+#endif
 
-  activeVFO = EEPROMData.currentVFO = VFO_A;
+  activeVFO     = EEPROMData.currentVFO;
+  xmtMode       = EEPROMData.xmtMode;
+  freqIncrement = incrementValues[tuneIndex];
 
   if (activeVFO == VFO_A)
     centerFreq = TxRxFreq = currentFreqA;
   else
     centerFreq = TxRxFreq = currentFreqB;
 
-#ifdef DEBUG1
-  EEPROMShow();                                     // To see EEPROM values on Serial monitor
-#endif
-
-  currentFreqA    = TxRxFreq = centerFreq = 7047700L;   // Test freq for W1AW
-
 #ifdef DEBUG
-  currentFreqA    = TxRxFreq = centerFreq = 7047700L;
-  decoderFlag     = CW_MODE;        // These could be SSB_MODE too
-  xmtMode         = CW_MODE;
-  //  xmtMode         = SSB_MODE;
-  filterWidth     = FILTER_WIDTH;
+  currentFreqA    = TxRxFreq = centerFreq = 7150000L;
+//  decoderFlag     = CW_MODE;        // These could be SSB_MODE too
+//  xmtMode         = CW_MODE;
+  xmtMode         = SSB_MODE;
+  decoderFlag     = SSB_MODE;
 #endif
 
-  kTemp = 0;
+  if (decoderFlag == CW_MODE) {
+    ShowDecoderMessage();
+  }
+  splitOn = 0;                                        // Split VFO not active
   SetupMode(bands[currentBand].mode);
 
-  ditLength     = STARTING_DITLENGTH;                // 80 = 1200 / 15 wpm
+  ditLength     = STARTING_DITLENGTH;                 // 80 = 1200 / 15 wpm
   averageDit    = ditLength;
   averageDah    = ditLength * 3L;
 
-  filterEncoder.write(currentWPM);
   SetDitLength(currentWPM);
 
   mainMenuIndex = 0;
-
+  menuStatus = NO_MENUS_ACTIVE;               // Blank menu field
   RedrawDisplayScreen();
+
   jackStart = millis();
   digitalWrite(PTT, HIGH);
 
   float32_t theta = 0.0;                      //AFP 02-02-22
-
-  for (int kf = 0; kf < 255; kf++) {          //Calc 750 hz sine wave, use 750 because it is 8 whole cycles in 256 buffer.
-    //theta = kf * 2*PI * 1600/ 24000;
-    theta = kf * 2 * PI * 11 / 256;
+  float32_t term  = 3.1415926535897932;
+  for (int kf = 0; kf < 255; kf++) {          //Calc sine wave
+    //    theta = kf * 2*PI * 1600/ 24000;
+    //    theta = kf * 2 * PI * 11 / 256;           // 2 * PI * 11 = 69.115038377 / 256 = 0.2699806186601563
+    theta = kf * 0.2699806186601563;          // Simplify terms from above
     sinBuffer[kf] = sin(theta);
   }
   ShowName();                                 // Show name and version
+  SetFreq();
   sineTone(BUFFER_SINE_COUNT);                // Set t0 7 from above
-
-  pinMode(A0, OUTPUT);  //PWM output
-  ditLength = 80;
-
+  filterEncoderMove   = 0;
+  fineTuneEncoderMove = 0L;
+  CenterFastTune();
+  ShowDefaultSettings();
+  menuStatus = NO_MENUS_ACTIVE;               // Blank menu field
 }
 //============================================================== END setup() =================================================================
 //===============================================================================================================================
 //===============================================================================================================================
 //===============================================================================================================================
 
-FASTRUN                   // Causes function to be allocated in RAM1 at startup for fastest performance.
-
 elapsedMicros usec = 0;   // Automatically increases as time passes; no ++ necessary.
+FASTRUN                   // Causes function to be allocated in RAM1 at startup for fastest performance.
 
 /*****
   Purpose: Code here executes forever, or until: 1) power is removed, 2) user does a reset, 3) a component
@@ -1980,90 +2058,25 @@ elapsedMicros usec = 0;   // Automatically increases as time passes; no ++ neces
 *****/
 void loop()
 {
+  unsigned char result;
   static int passFlag = 0;
-  int pushButtonSwitchIndex;
+  int pushButtonSwitchIndex = -1;
   int valPin;
-  long centerFreq;
 
   valPin = ReadSelectedPushButton();                        // Poll UI push buttons
-
-  if (valPin != BOGUS_PIN_READ) {                           // If a button was pushed...
+  if (valPin != BOGUS_PIN_READ) {                           // If not -1, a button was pushed...
     pushButtonSwitchIndex = ProcessButtonPress(valPin);     // Winner, winner...chicken dinner!
     ExecuteButtonPress(pushButtonSwitchIndex);
   }
-
-// This is polling code. I am not sure how I want the CW coding to work. This code does not work...YET!
-
-  if (digitalRead(KEYER_DIT_INPUT_TIP) == LOW) {
-    Dit();
-  } else {
-    if (digitalRead(KEYER_DAH_INPUT_RING) == LOW) {
-      Dah();
-    }
-  }
-
-  /*
-    if (xmtMode == CW_MODE) {
-      if (digitalRead(KEYER_DIT_INPUT_TIP) == LOW || digitalRead(KEYER_DAH_INPUT_RING) == LOW) {        //=========================== CW Transmit ================
-
-      CWOnState = 1;
-
-      while (CWOnState == 1) {
-        digitalWrite(MUTE, LOW);
-        digitalWrite(RXTX, HIGH);
-        CWFreqShift = 750;
-        SetFreq();
-
-        si5351.output_enable(SI5351_CLK2, 0);
-        modeSelectInR.gain(0, 1.0);               //Selects Ex
-        modeSelectInR.gain(1, 0.0);               //Selects Ex
-        modeSelectInL.gain(0, 1.0);               //Selects Ex
-        modeSelectInL.gain(1, 0.0);               //Selects Ex
-
-        modeSelectOutL.gain(0, 0);
-        modeSelectOutR.gain(0, 0);
-        modeSelectOutExL.gain(0, 1.0);
-        modeSelectOutExR.gain(0, 1.0);
-        ExciterIQData();
-
-          digitalWrite(RXTX, LOW);
-          CWOnState   = 0;
-          CWFreqShift = 0;
-          break;
-      }
-    } else {
-  */
-  if (xmtMode == SSB_MODE && digitalRead(PTT) == LOW) {         //   SSB Transmit
-    digitalWrite(MUTE, LOW);
-    digitalWrite(RXTX, HIGH);
-    si5351.output_enable(SI5351_CLK1, 1);
-    si5351.output_enable(SI5351_CLK2, 0);
-    modeSelectInR.gain(0, 1.0);               //Selects Ex
-    modeSelectInR.gain(1, 0.0);               //Selects Ex
-    modeSelectInL.gain(0, 1.0);               //Selects Ex
-    modeSelectInL.gain(1, 0.0);               //Selects Ex
-
-    modeSelectOutL.gain(0, 0);
-    modeSelectOutR.gain(0, 0);
-    modeSelectOutExL.gain(0, 1.0);
-    modeSelectOutExR.gain(0, 1.0);
-    CWFreqShift = 0;
-    SetFreq();
-    ExciterIQData();
-    CWOnState = 0;
-    CWOnState = 0;
-  }
   //===========================  Receive ================
-  if (digitalRead(PTT) == HIGH && (digitalRead(KEYER_DIT_INPUT_TIP) == HIGH || digitalRead(KEYER_DAH_INPUT_RING) == HIGH)) {
-    //Serial.println("In receive");
-    si5351.output_enable(SI5351_CLK2, 1);
+  if (digitalRead(PTT) == HIGH ) {
+    //if (digitalRead(PTT) == HIGH && (digitalRead(KEYER_DIT_INPUT_TIP) == HIGH || digitalRead(KEYER_DAH_INPUT_RING) == HIGH)) {
 
     modeSelectInR.gain(0, 0.0);                 //Selects Rec
     modeSelectInR.gain(1, 1.0);                 //Selects Rec
     modeSelectInL.gain(0, 0.0);                 //Selects Rec
     modeSelectInL.gain(1, 1.0);                 //Selects Rec
     digitalWrite(RXTX, LOW);                    // New board with wisker fix
-    digitalWrite(MUTE, HIGH);
 
     modeSelectOutExL.gain(0, 0);
     modeSelectOutExR.gain(0, 0);
@@ -2073,31 +2086,41 @@ void loop()
     phaseLO             = 0.0;
     barGraphUpdate      = 0;
     omitOutputFlag      = false;
+    SetFineTuneFrequency();                                   // draw FastTune frequency line
+    ShowSpectrum();                                           // Now calls ProcessIQData and Encoders calls
+  } else {
+    if (digitalRead(PTT) == LOW ) {  //===========================  Transmit ================
+      digitalWrite(RXTX, HIGH);
+      modeSelectInR.gain(0, 1.0);               //Selects Ex
+      modeSelectInR.gain(1, 0.0);               //Selects Ex
+      modeSelectInL.gain(0, 1.0);               //Selects Ex
+      modeSelectInL.gain(1, 0.0);               //Selects Ex
 
-    SetFastTuneFrequency();                                   // draw FastTune frequency line
-    ShowSpectrum();                                           //Now calls ProcessIQData and Encoders calls
-
-    valPin = ReadSelectedPushButton();                        // Poll UI push buttons
-
-    if (valPin != BOGUS_PIN_READ) {                           // If a button was pushed...
-      pushButtonSwitchIndex = ProcessButtonPress(valPin);     // Winner, winner...chicken dinner!
-      ExecuteButtonPress(pushButtonSwitchIndex);
-    }
-#ifdef DEBUG1
-    if (elapsed_micros_idx_t > (SR[SampleRate].rate / 960) )
-    {
-      ShowTempAndLoad();                                      // Used to monitor CPU temp and load factors
-    }
-#endif
-    if (encoder_check.check() == 1)                           // Checks every 100ms for signal. Will likely change
-    {
-      EncoderVolume();
-      ShowAnalogGain();
-    }
-    if (ms_500.check() == 1)                                  // For clock updates
-    {
-      wait_flag = 0;
-      DisplayClock();
+      modeSelectOutL.gain(0, 0);
+      modeSelectOutR.gain(0, 0);
+      modeSelectOutExL.gain(0, 1.0);
+      modeSelectOutExR.gain(0, 1.0);
+      CWFreqShift = 0;
+      SetFreq();
+      ExciterIQData();
     }
   }
-} // end loop
+
+#ifdef DEBUG1
+  if (elapsed_micros_idx_t > (SR[SampleRate].rate / 960) )
+  {
+    ShowTempAndLoad();                                      // Used to monitor CPU temp and load factors
+  }
+#endif
+
+  if (volumeChangeFlag == true) {
+    volumeChangeFlag = false;
+    UpdateVolumeField();
+  }
+
+  if (ms_500.check() == 1)                                  // For clock updates
+  {
+    wait_flag = 0;
+    DisplayClock();
+  }
+}               // end loop

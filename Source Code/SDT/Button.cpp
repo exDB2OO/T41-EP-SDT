@@ -1,9 +1,23 @@
-
 #ifndef BEENHERE
 #include "SDT.h"
 #endif
 
+/*****
+  Purpose: Error message if Select button pressed with no Menu active
 
+  Parameter list:
+    void
+
+  Return value;
+    void
+*****/
+void NoActiveMenu()
+{
+    tft.setFontScale( (enum RA8875tsize) 1);    
+    tft.setTextColor(RA8875_RED);
+    tft.setCursor(10, 0);
+    tft.print("No menu selected");  
+}
 /*****
   Purpose: Function is designed to route program control to the proper execution point in response to
            a button press.
@@ -16,27 +30,32 @@
 *****/
 void ExecuteButtonPress(int val)
 {
-  int h = SPECTRUM_HEIGHT + 3;    // Al changed but didn't annotate. Jack added 12/29/21
-  int TxRxFreqTruncated;
-
+  if (val == MENU_OPTION_SELECT && menuStatus == NO_MENUS_ACTIVE) {          // Pressed Select with no primary/secondary menu selected
+    NoActiveMenu();
+    return;
+  } else {
+    menuStatus = PRIMARY_MENU_ACTIVE;
+  }
   switch (val) {
     case MENU_OPTION_SELECT:                                     // 0
-      if (secondaryMenuIndex == -1) {                           // Doing primary menu
-        /* int (*functionPtr[])()                = {&CWOptions, &ButtonDisplayOptions, &SpectrumOptions, &AGCOptions,
-                                                    &NROptions, &IQOptions, &EqualizerRecOptions, &EqualizerXmtOptions,
-                                                    &MicOptions, &FrequencyOptions, &NBOptions, &RFOptions,
-                                                    &PostProcessorAudio, &VFOSelect, &EEPROMOptions
-                                                   };
-          //  const char *topMenus[]    = { "CW", "Display Choices", "Spectrum Set", "AGC", "Noise Reduction",
-          //                                "IQ Manual", "EQ Rec Set", "EQ Xmt Set", "Mic Comp", "Freq Cal",
-          //                                "NB Set", "RF Set", "Audio Post Proc", "VFO Select", "EEPROM"      // Assume no EEPROM for now, "EEPROM" 12 elements  JJP 1-28-21
-          //                              };
-        */
-        secondaryMenuChoiceMade = functionPtr[mainMenuIndex]();   // These are processed in MenuProcessing.cpp
+      /*                                    Useful comment in understanding how menues align:
 
+          const char *topMenus[]    = { "CW",  "Spectrum Set", "AGC", "NR Set",
+                                        "IQ Manual", "EQ Rec Set", "EQ Xmt Set", "Mic Comp", "Freq Cal",
+                                        "NB Set", "RF Set", "Audio Post Proc", "VFO Select", "EEPROM"
+                                      };
+         int (*functionPtr[])()     = {&CWOptions, &SpectrumOptions, &AGCOptions, &NROptions,
+                                         &IQOptions, &EqualizerRecOptions, &EqualizerXmtOptions, &MicOptions, &FrequencyOptions,
+                                         &NBOptions, &RFOptions, &PostProcessorAudio, &VFOSelect, &EEPROMOptions
+                                         };
+      */
+
+      if (secondaryMenuIndex == -1) {                             // Doing primary menu
+        secondaryMenuChoiceMade = functionPtr[mainMenuIndex]();   // These are processed in MenuProcessing.cpp
+        menuStatus = SECONDARY_MENU_ACTIVE;
         secondaryMenuIndex = -1;                                  // Reset secondary menu
       }
-      tft.fillRect(0, 0, RIGNAME_X_OFFSET - 2, CHAR_HEIGHT + 1, RA8875_BLACK);         // Erase menu choices
+      EraseMenus();
       break;
 
     case MAIN_MENU_UP:                                            // 1
@@ -47,12 +66,13 @@ void ExecuteButtonPress(int val)
       break;
 
     case BAND_UP:
-      filterWidth = FILTER_WIDTH;
       ShowSpectrum();                                           //Now calls ProcessIQData and Encoders calls
       digitalWrite(bandswitchPins[currentBand], LOW);
       ButtonBandIncrease();
       digitalWrite(bandswitchPins[currentBand], HIGH);
       BandInformation();
+      NCO_FREQ = 0L;
+      CenterFilterOverlay();
       break;
 
     case ZOOM:                                                    // 3
@@ -67,12 +87,14 @@ void ExecuteButtonPress(int val)
       break;
 
     case BAND_DN:                                                 // 5
-      filterWidth = FILTER_WIDTH;
+      //filterWidth = FILTER_WIDTH;
       ShowSpectrum();                                           //Now calls ProcessIQData and Encoders calls
       digitalWrite(bandswitchPins[currentBand], LOW);
       ButtonBandDecrease();
       digitalWrite(bandswitchPins[currentBand], HIGH);
       BandInformation();
+      NCO_FREQ = 0L;
+      CenterFilterOverlay();
       break;
 
     case FILTER:                                                  // 6
@@ -91,15 +113,15 @@ void ExecuteButtonPress(int val)
       ButtonNR();
       break;
 
-    case NOTCH_FILTER:                                             // 10
+    case NOTCH_FILTER:                                            // 10
       ButtonNotchFilter();
       UpdateNotchField();
       break;
-
-    case DISPLAY_OPTIONS:                                         //  11
-      ButtonDisplayOptions();
-      break;
-
+    /*
+        case DISPLAY_OPTIONS:                                         //  11
+          ButtonDisplayOptions();
+          break;
+    */
     case INCREMENT:                                               // 12
       ButtonFreqIncrement();
       break;
@@ -109,18 +131,15 @@ void ExecuteButtonPress(int val)
       break;
 
     case UNUSED_1:                                                // 14
-
-      TxRxFreqTruncated = TxRxFreq / 10000;
-      centerFreq = TxRxFreqTruncated * 10000;
-      NCO_FREQ = 0;
-      TxRxFreq = centerFreq + NCO_FREQ;
-      newCursorPosition = 256;
-      fastTuneEncoder.write(newCursorPosition);
-      tft.drawFastVLine(oldCursorPosition, SPECTRUM_TOP_Y + 20, h - 30, RA8875_BLACK);  // Yep. Erase old, draw new...
-      tft.drawFastVLine(newCursorPosition , SPECTRUM_TOP_Y + 20, h - 30, RA8875_RED); //
-      oldCursorPosition = 256;
-      SetFreq();
-      ShowFrequency();
+      if (stepFT == 50) {                                                       // AFP 06-22-22 Fine tune step toggle
+        stepFT = 500;
+      }
+      else {
+        if (stepFT == 500) {
+          stepFT = 50;
+        }
+      }
+      UpdateIncrementField();
       break;
 
     case UNUSED_2:
@@ -203,7 +222,6 @@ void BandDecrease()
   SetBand();
   ControlFilterF();
   FilterBandwidth();
-//  UpdateIncrementField();
   DrawSMeterContainer();
   SetFreq();
   AGCPrep();
@@ -246,9 +264,8 @@ void BandIncrease()
   Return value:
     void
 *****/
-void ButtonFreqIncrement()           
+void ButtonFreqIncrement()
 {
-  long incrementValues[] = {10, 50, 100, 250, 1000, 10000};
   tuneIndex--;
   if (tuneIndex < 0)
     tuneIndex = 5;
@@ -267,19 +284,15 @@ void ButtonFreqIncrement()
 *****/
 int ReadSelectedPushButton()
 {
-  minPinRead = 0;
-  int buttonReadOld = 1024;
-                                                  // do exponential averaging to smooth out the button response
-  while (abs(minPinRead - buttonReadOld) > 3 ) {
-    minPinRead = analogRead(BUSY_ANALOG_PIN);
-    buttonRead = .1 * minPinRead + (1 - .1) * buttonReadOld; // See expected values in next function.
-    buttonReadOld = buttonRead;
-  }
-  if (buttonRead > NOTHING_TO_SEE_HERE) {
+
+  minPinRead = analogRead(BUSY_ANALOG_PIN);
+ 
+  if (minPinRead > NOTHING_TO_SEE_HERE) {          // Value too high; not valid choice
     return -1;
   }
-  minPinRead = buttonRead;
-  delay(100);
+  if (menuStatus == NO_MENUS_ACTIVE) {
+
+  }
   return minPinRead;
 }
 
@@ -296,10 +309,14 @@ int ProcessButtonPress(int valPin)
 {
   int switchIndex;
 
-  if (valPin == -1) {                  // Not valid press
+  if (valPin == BOGUS_PIN_READ) {                  // Not valid press
     return -1;
   }
-  
+
+  if (valPin == MENU_OPTION_SELECT && menuStatus == NO_MENUS_ACTIVE) {
+    NoActiveMenu();
+    return -1;
+  }
   for (switchIndex = 0; switchIndex < TOP_MENU_COUNT; switchIndex++)
   {
     if (abs(valPin - EEPROMData.switchValues[switchIndex]) < WIGGLE_ROOM)    // ...because ADC does return exact values every time

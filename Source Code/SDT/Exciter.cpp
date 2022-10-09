@@ -23,7 +23,6 @@
 *****/
 void ExciterIQData()
 {
-  //  int transmitEQ_Flag = 0;
   uint32_t N_BLOCKS_EX                         = N_B_EX;
 
   /**********************************************************************************  AFP 12-31-20
@@ -63,35 +62,16 @@ void ExciterIQData()
               192KHz/8 = 24KHz, with 8xsmaller sample sizes
      **********************************************************************************/
 
-    //192KHz effective sample rate here
+    // 192KHz effective sample rate here
     // decimation-by-4 in-place!
     arm_fir_decimate_f32(&FIR_dec1_EX_I, float_buffer_L_EX, float_buffer_L_EX, BUFFER_SIZE * N_BLOCKS_EX );
     arm_fir_decimate_f32(&FIR_dec1_EX_Q, float_buffer_R_EX, float_buffer_R_EX, BUFFER_SIZE * N_BLOCKS_EX );
-    //48KHz effective sample rate here
+    // 48KHz effective sample rate here
     // decimation-by-2 in-place
     arm_fir_decimate_f32(&FIR_dec2_EX_I, float_buffer_L_EX, float_buffer_L_EX, 512);
     arm_fir_decimate_f32(&FIR_dec2_EX_Q, float_buffer_R_EX, float_buffer_R_EX, 512);
 
-    if (xmtMode == CW_MODE) {
-//      int numCycles;
-//      numCycles = 7;
-//      sineTone(numCycles);
-      arm_copy_f32(sinBuffer2, float_buffer_L_EX, FFT_length / 2);
-      arm_copy_f32(sinBuffer2, float_buffer_R_EX, FFT_length / 2);
-      arm_scale_f32 (float_buffer_L_EX, .1, float_buffer_L_EX, FFT_length / 2);
-      arm_scale_f32 (float_buffer_R_EX, .1, float_buffer_R_EX, FFT_length / 2);
-
-      if (digitalRead(KEYER_DIT_INPUT_TIP) == LOW || digitalRead(KEYER_DAH_INPUT_RING) == LOW) {
-        arm_scale_f32 (float_buffer_L_EX, 1, float_buffer_L_EX, FFT_length / 2);
-        arm_scale_f32 (float_buffer_R_EX, 1, float_buffer_R_EX, FFT_length / 2);
-      } else if (digitalRead(KEYER_DIT_INPUT_TIP) == HIGH || digitalRead(KEYER_DAH_INPUT_RING) == HIGH) {
-        arm_scale_f32 (float_buffer_L_EX, 0, float_buffer_L_EX, FFT_length / 2);
-        arm_scale_f32 (float_buffer_R_EX, 0, float_buffer_R_EX, FFT_length / 2);
-      }
-      arm_copy_f32 (float_buffer_L_EX, float_buffer_R_EX, 256);
-    } else if(xmtMode == SSB_MODE){
-      arm_copy_f32 (float_buffer_L_EX, float_buffer_R_EX, 256);
-    }
+    arm_copy_f32 (float_buffer_L_EX, float_buffer_R_EX, 256);
 
     //--------------  Hilbert Transformers
     //arm_copy_f32 (float_buffer_L_EX, float_buffer_R_EX, 256);
@@ -110,16 +90,10 @@ void ExciterIQData()
               Additional scaling, if nesessary to compensate for down-stream gain variations
      **********************************************************************************/
     if (bands[currentBand].mode == DEMOD_LSB) { //AFP 12-27-21
-      //arm_scale_f32 (float_buffer_L_EX, IQ_Xamplitude_correction_factor, float_buffer_L_EX, 256);
-      //arm_scale_f32 (float_buffer_L_EX, -1.012, float_buffer_L_EX, 256);
-      arm_scale_f32 (float_buffer_L_EX, -1.015, float_buffer_L_EX, 256);
-      //IQPhaseCorrection(float_buffer_L_EX, float_buffer_R_EX, IQ_Xphase_correction_factor, 256);
+      arm_scale_f32 (float_buffer_L_EX, 1.015, float_buffer_L_EX, 256);
       IQPhaseCorrection(float_buffer_L_EX, float_buffer_R_EX, .013, 256);
-      //IQPhaseCorrection(float_buffer_L_EX, float_buffer_R_EX, 0, 256);
     }
     else if (bands[currentBand].mode == DEMOD_USB) { //AFP 12-27-21
-      //arm_scale_f32 (float_buffer_L_EX, -1.005, float_buffer_L_EX, 256);
-      //arm_scale_f32 (float_buffer_L_EX, -.965, float_buffer_L_EX, 256);
       arm_scale_f32 (float_buffer_L_EX, -.965, float_buffer_L_EX, 256);
       IQPhaseCorrection(float_buffer_L_EX, float_buffer_R_EX, -0.12, 256);
     }
@@ -145,7 +119,6 @@ void ExciterIQData()
     //  192KHz effective sample rate here
     arm_scale_f32(float_buffer_L_EX, 20, float_buffer_L_EX, 2048); //Scale to compensate for losses in Interpolation
     arm_scale_f32(float_buffer_R_EX, 20, float_buffer_R_EX, 2048);
-
 
     /**********************************************************************************  AFP 12-31-20
       CONVERT TO INTEGER AND PLAY AUDIO

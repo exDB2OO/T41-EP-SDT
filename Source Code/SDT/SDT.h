@@ -1,45 +1,44 @@
 #ifndef BEENHERE
-#define BEENHERERA8875_DISPLAYRA8875_DISPLAY
+#define BEENHERE
 
 //======================================== Library include files ========================================================
 #include <Adafruit_GFX.h>
 #include "Fonts/FreeMonoBold24pt7b.h"
 #include "Fonts/FreeMonoBold18pt7b.h"
 #include "Fonts/FreeMono24pt7b.h"
+#include "Fonts/FreeMono9pt7b.h"
 #include <Audio.h>
 #include <TimeLib.h>                                // Part of Teensy Time library
 #include <Wire.h>
-#include <SPI.h>																		// https://github.com/etherkit/Si5351Arduino
+#include <SPI.h>
 #include <SD.h>
 #include <Metro.h>
 #include <Bounce.h>
 #include <arm_math.h>
 #include <arm_const_structs.h>
 #include <si5351.h>                                 // https://github.com/etherkit/Si5351Arduino
-#include <Encoder.h>
+#include <RA8875.h>                              // https://github.com/mjs513/RA8875/tree/RA8875_t4
 #include <Rotary.h>                                 // https://github.com/brianlow/Rotary
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-//#include <hardware/teensy/avr/libraries/Adafruit_GFX/Fonts/FreeMono18pt7b.h>                         // In Adafrui_GFX
 #include <util/crc16.h>                             //mdrhere
 #include <utility/imxrt_hw.h>                       // for setting I2S freq, Thanks, FrankB!
 #include <EEPROM.h>
 
 //======================================== Symbolic Constants for Debugging and Version Control ========================
-#define VERSION                     "V010  "
+#define VERSION                     "V015"
 #define RIGNAME                     "T41-EP SDT"
 #define SPLASH_DELAY                1000L         // Probably should be 4000 to actually read it
-#define RIGNAME_X_OFFSET            580
+#define RIGNAME_X_OFFSET            570
 #define T4                                        // Says we are using a Teensy 4 or 4.1
 #define RA8875_DISPLAY              1             // Comment out if not using RA8875 display
 
-#define DEBUG                       1             // This must be uncommented for ANY debugging statements to work
+//#define DEBUG                       1             // This must be uncommented for ANY debugging statements to work
 //#define STORE_SWITCH_VALUES                       // Uncomment to save the analog switch values for your push button matrix
 
 #define OFF                         0
 #define ON                          1
-
 
 //#define DEBUG_JACK
 //#define DEBUG1
@@ -50,7 +49,7 @@
 //#define DEBUG7
 //#define DEBUG8
 //#define DEBUG9
-#define NUMBER_OF_ELEMENTS(x) (sizeof(x)/sizeof(x[0]))
+#define NUMBER_OF_ELEMENTS(x) (sizeof(x)/sizeof(x[0]))  // Typeless way to find number of elements
 #define NEW_SI5351_FREQ_MULT    1UL
 
 
@@ -66,20 +65,28 @@
 #define SWITCH_DEBOUNCE_DELAY       50L     // Milliseconds for the switch to settle down
 #define NUMBER_OF_SWITCHES           16     // Number of push button switches
 #define CHAR_HEIGHT                  32
+
 #define PIXELS_PER_EQUALIZER_DELTA   10     // Number of pixeks per detent of encoder for equalizer changes
+#define PIXELS_PER_AUDIO_DELTA       10
 #define AUDIO_PLOT_CEILING          119     // (SPECTRUM_BOTTOM - AUDIO_SPECTRUM_TOP)
 
 #define TOP_MENU_COUNT               16     // Menus to process
 #define MAX_FAVORITES                10     // Max number of favorite frequencies stored in EEPROM
+
 #define PRIMARY_MENU                  0
 #define SECONDARY_MENU                1
 #define SELECTED_INDEX                3     // This is the index for MENU_OPTION_SELECT
+#define PRIMARY_MENU_X                0
+#define SECONDARY_MENU_X              250
+#define MENUS_Y                       0
+#define MENU_WIDTHS                   300
 
-/*
-  const char *topMenus[]                    = {"CW",              "Display Choices", "Spectrum Set",   "AGC",        "NR Set",
-                                             "IQ Manual",       "EQ Rec Set",   "EQ Xmt Set",     "Mic Comp",   "Freq Cal",
-                                             "Noise Reduction", "RF Set",       "Audio Post Proc","VFO Select", "EEPROM",
-                                             "Noise Floor",    "Unused 1"
+
+/*                                      just put here to make it easy to see the menu sequence
+  const char *topMenus[]                    = {"CW",            "Display Choices", "Spectrum Set",   "AGC",        "NR Set",
+                                             "IQ Manual",       "EQ Rec Set",      "EQ Xmt Set",     "Mic Comp",   "Freq Cal",
+                                             "Noise Reduction", "RF Set",          "Audio Post Proc","VFO Select", "EEPROM",
+                                             "Noise Floor",     "Unused 1"
                                             };
 */
 #define MENU_OPTION_SELECT           0     // These are the expected values from the switch ladder
@@ -109,7 +116,7 @@
 
 #define SPECTRUM_LEFT_X       3            // Used to plot left edge of spectrum display  AFP 12-14-21
 #define WATERFALL_LEFT_X      SPECTRUM_LEFT_X
-
+#define SPECT_RES_92          512/92000
 #ifdef RA8875_DISPLAY // -------------------------------------             Standard display
 
 #define CLIP_AUDIO_PEAK       115           // The pixel value where audio peak overwrites S-meter
@@ -117,28 +124,29 @@
 #define SPECTRUM_RES          512
 #define SPECTRUM_TOP_Y        100           // Start of spectrum plot space
 #define SPECTRUM_HEIGHT       150           // This is the pixel height of spectrum plot area without disturbing the axes
-#define SPECTRUM_BOTTOM       (SPECTRUM_TOP_Y + SPECTRUM_HEIGHT - 3)
+#define SPECTRUM_BOTTOM       (SPECTRUM_TOP_Y + SPECTRUM_HEIGHT - 3)        // 247 = 100 + 150 - 3
 #define AUDIO_SPECTRUM_TOP    129
 #define AUDIO_SPECTRUM_BOTTOM SPECTRUM_BOTTOM
 #define MAX_WATERFALL_WIDTH   512           // Pixel width of waterfall
 #define MAX_WATERFALL_ROWS    170           // Waterfall rows
 
-#define WATERFALL_RIGHT_X     (WATERFALL_LEFT_X + MAX_WATERFALL_WIDTH)
+#define WATERFALL_RIGHT_X     (WATERFALL_LEFT_X + MAX_WATERFALL_WIDTH)      // 3 + 512
 #define WATERFALL_TOP_Y       (SPECTRUM_TOP_Y + SPECTRUM_HEIGHT + 5)        // 130 + 120 + 5 = 255
 #define FIRST_WATERFALL_LINE  (WATERFALL_TOP_Y + 20)                        // 255 + 35 = 290
 #define WATERFALL_BOTTOM      (FIRST_WATERFALL_LINE + MAX_WATERFALL_ROWS)   // 290 + 170 = 460
-//#define TEMP_X_OFFSET         20
 #define TEMP_X_OFFSET         15
-#define TEMP_Y_OFFSET         YPIXELS * 0.97
-#define AGC_Y_OFFSET          260
+#define TEMP_Y_OFFSET         465                                           // 480 * 0.97 = 465
+#define AGC_Y_OFFSET          292
 #define AGC_X_OFFSET          720
 #define VOLUME_Y_OFFSET       180
 #define INCREMENT_X           WATERFALL_RIGHT_X + 25
 #define INCREMENT_Y           WATERFALL_TOP_Y   + 70
 #define SPECTRUMCORNER_X      INCREMENT_X
 #define SPECTRUMCORNER_Y      INCREMENT_Y
+#define INFORMATION_WINDOW_X  WATERFALL_RIGHT_X + 25                        // 512 + 25 = 537
+#define INFORMATION_WINDOW_Y  WATERFALL_TOP_Y + 37                          // 255 + 37 = 292
 #define BAND_INDICATOR_X      WATERFALL_RIGHT_X + 25
-#define BAND_INDICATOR_Y      WATERFALL_TOP_Y + 37
+#define BAND_INDICATOR_Y      WATERFALL_TOP_Y + 37                          // 292
 #define OPERATION_STATS_X     130
 #define OPERATION_STATS_Y     75
 #define BAND_SUMMARY_X        BAND_INDICATOR_X
@@ -159,12 +167,13 @@
 #define DEFAULT_EQUALIZER_BAR 100                                         // Default equalizer bar height
 #define FREQUENCY_X           5
 #define FREQUENCY_Y           45
-#define FREQUENCY_X_SPLIT     285
+#define FREQUENCY_X_SPLIT     280
 #define VFO_A                 0
 #define VFO_B                 1
 #define VFOA_PIXEL_LENGTH     275
 #define VFOB_PIXEL_LENGTH     280
 #define FREQUENCY_PIXEL_HI    45
+#define SPLIT_INCREMENT       500L
 // Offsets for status info
 #define FIELD_OFFSET_X        WATERFALL_RIGHT_X + 118                     // X coordinate for field
 #define NOTCH_X               WATERFALL_RIGHT_X + 58
@@ -175,12 +184,14 @@
 #define ZOOM_Y                WATERFALL_TOP_Y   + 130
 #define COMPRESSION_X         WATERFALL_RIGHT_X + 33
 #define COMPRESSION_Y         WATERFALL_TOP_Y   + 150
-#define DECODER_X             WATERFALL_RIGHT_X + 43
+#define DECODER_X             WATERFALL_RIGHT_X + 43                      // 512 + 43 = 555
 #define DECODER_Y             WATERFALL_TOP_Y   + 190
 #define WPM_X                 WATERFALL_RIGHT_X + 58
 #define WPM_Y                 WATERFALL_TOP_Y   + 170
 #define NR_X_OFF              WATERFALL_RIGHT_X + 80
 #define NR_Y_OFF              WATERFALL_TOP_Y   + 190
+#define VOLUME_INFO_FIELD_X   540
+#define VOLUME_INFO_FIELD_Y   292
 
 #define MAX_DECODE_CHARS        30                    // Max chars that can appear on decoder line
 #define DECODER_BUFFER_SIZE     128                   // Max chars in binary search string with , . ?
@@ -229,6 +240,8 @@
 #define BUFFER_SINE_COUNT     7                 // Leads to a 750Hz signal
 
 #define EQUALIZER_CELL_COUNT  14
+#define AUDIO_CELL_COUNT      8
+
 #define USE_LOG10FAST
 #define USE_W7PUA
 #define MP3
@@ -266,7 +279,6 @@
 #define  RA8875_GREENYELLOW 0xAFE5              /* 173, 255,  47 */
 #define  PINK        0xF81F
 #else
-#include <RA8875.h>                             // https://github.com/sumotoy/RA8875
 #define  ORANGE      0xFD20                     /* 255, 165,   0 */
 #define  FILTER_WIN  0x10                       // Color of SSB filter width
 #endif
@@ -308,15 +320,15 @@
 
 #define MOSELEY                     0
 #define TIMEZONE                    "EST: "     // Set for eastern time
-//#define CHANG                     0
 #define MOSELEY                     0
 
-#define DEFAULTFREQINCREMENT        50          //Values 10, 50, 250, 1000
+#define DEFAULTFREQINCREMENT        1000L       //Values 10, 50, 250, 1000
 #define FAST_TUNE_INCREMENT         50L
 #define DEFAULTFREQINDEX            3           //  Index 10Hz=> 0, 50Hz=> 1, 250Hz=> 2, 1000Hz=> 3
 #define TEMPMON_ROOMTEMP            25.0f
 #define MAX_WPM                     60
 #define MAX_TONE                    1000
+#define MIN_TONE                    300
 
 #define ENCODER_FACTOR              0.25F        // use 0.25f with cheap encoders that have 4 detents per step, 
 // for other encoders or libs we use 1.0f
@@ -340,10 +352,10 @@
 //========================================= Encoder pins
 #define VOLUME_ENCODER_A            2     // Volume encoder  
 #define VOLUME_ENCODER_B            3
-#define ENCODER3_ENCODER_A          4     // Menu encoder 
+#define ENCODER3_ENCODER_A          4     // Fine Tune encoder 
 #define ENCODER3_ENCODER_B          5
-#define FILTER_ENCODER_A            14    // Filter encoder
-#define FILTER_ENCODER_B            15
+#define FILTER_ENCODER_A            15    // Filter encoder
+#define FILTER_ENCODER_B            14
 #define TUNE_ENCODER_A              16    // Tune encoder
 #define TUNE_ENCODER_B              17
 //========================================= Filter Board pins
@@ -357,9 +369,9 @@
 //========================================= Switch pins
 #define BAND_MENUS                  100    // encoder2 button = button3SW
 #define BAND_PLUS                   101    // BAND+ = button2SW
-#define CHANGE_INCREMENT            102   // this is the pushbutton pin of the tune encoder
+#define CHANGE_INCREMENT            102    // this is the pushbutton pin of the tune encoder
 #define CHANGE_FILTER               103    // this is the pushbutton pin of the filter encoder
-#define CHANGE_MODE                104    // Change mode
+#define CHANGE_MODE                 104    // Change mode
 #define CHANGE_MENU2                105    // this is the pushbutton pin of encoder 3
 #define MENU_MINUS                  106    // Menu decrement
 #define MENU_PLUS                   107    // this is the menu button pin
@@ -367,6 +379,10 @@
 #define CHANGE_DEMOD                109    // this is the push button for demodulation
 #define CHANGE_ZOOM                 110    // Push button for display zoom feature
 #define SET_FREQ_CURSOR             111    // Push button for frequency Cursor feature  was 39 for Al
+
+#define NO_MENUS_ACTIVE             0      // No menus displayed 
+#define PRIMARY_MENU_ACTIVE         1      // A primary menu is active
+#define SECONDARY_MENU_ACTIVE       2      // Both primary and secondary menus active
 
 //========================================= Keyer pins
 //#define TONEPIN                     xx    // For sidetone
@@ -493,6 +509,7 @@
 #define NOTCHL                      15
 #define NOTCHCOLOUR                  RA8875_YELLOW
 
+/*
 #define TUNE_STEP_MIN               0
 #define TUNE_STEP1                  0
 #define TUNE_STEP2                  1
@@ -502,7 +519,7 @@
 #define TUNE_STEP_MAX               4
 #define FIRST_TUNEHELP              1
 #define LAST_TUNEHELP               3
-
+*/
 // Menus !
 #define MENU_F_HI_CUT               0
 #define MENU_SPECTRUM_ZOOM          1
@@ -585,14 +602,17 @@
 #define UU                          'y'
 
 #define CONFIG_VERSION "mr1"  //mdrhere ID of the E settings block, change if structure changes
-#define CONFIG_START 0                      // Address start the EEPROM data. (emulated with size of 4K. Actual address managed in library)
+#define CONFIG_START 0                                    // Address start the EEPROM data. (emulated with size of 4K. Actual address managed in library)
 
-#define TERMCHRXWIDTH               9       // print stuff for text terminal
+#define TERMCHRXWIDTH               9                     // print stuff for text terminal
 #define TERMCHRYWIDTH               10
-#define TERMNROWS                   4  // 15 
-#define TERMNCOLS                   28 // 34 
-#define CW_X_START                  spectrum_x + 2 // 1
-#define CW_Y_START                  spectrum_y - 1 // 55
+#define TERMNROWS                   4                     // 15 
+#define TERMNCOLS                   28                    // 34 
+
+#define CW_TEXT_START_X             5
+#define CW_TEXT_START_Y             449                   // 480 * 0.97 = 465 - height = 465 - 16 = 449
+#define CW_MESSAGE_WIDTH            MAX_WATERFALL_WIDTH   // 512
+#define CW_MESSAGE_HEIGHT           16                    // tft.getFontHeight()
 
 #ifdef USE_W7PUA
 
@@ -732,6 +752,8 @@ extern float thresholdGapArithmeticMean;
 
 extern long notchFreq;
 extern long notchPosOld;
+extern long filter_pos;
+extern long last_filter_pos;
 // ============ end new stuff =======
 
 
@@ -894,10 +916,13 @@ void ExciterIQData();
 //==================== End Excite Variables ================================
 
 //======================================== Global object declarations ==================================================
-extern float32_t NCO_FREQ ; // AFP 04-16-22
-//extern float32_t NCO_FREQ  //LSB
-extern double stepFT;
-extern double stepFT2;
+//extern float32_t NCO_FREQ ; // AFP 04-16-22
+extern long NCO_FREQ ; // AFP 04-16-22
+
+//extern double stepFT;
+//extern double stepFT2;
+extern unsigned long stepFT;
+extern unsigned long stepFT2;
 extern float32_t NCO_INC ;  // AFP 04-16-22
 extern double OSC_COS;
 extern double  OSC_SIN;
@@ -972,11 +997,14 @@ extern Bounce demodSwitch;
 extern Bounce zoomSwitch;
 extern Bounce cursorSwitch;
 
-extern Rotary tuneEncoder;
-//extern Rotary fastTuneEncoder;          // 4, 5
-extern Encoder fastTuneEncoder;        //(4, 5);
-extern Encoder filterEncoder;
-extern Encoder volumeEncoder;      //(2, 3);
+extern Rotary volumeEncoder;        // (2,  3)
+extern Rotary tuneEncoder;          // (16, 17)
+extern Rotary filterEncoder;        // (14, 15)
+extern Rotary fineTuneEncoder;  // (4,  5);
+//extern Encoder fineTuneEncoder;   // (4,  5);
+//extern Rotary fineTuneEncoder;
+//extern Encoder filterEncoder;
+//extern Encoder volumeEncoder;
 
 extern Metro ms_500;            // Set up a Metro
 extern Metro encoder_check;     // Set up a Metro
@@ -1000,7 +1028,6 @@ extern struct config_t {
 
   int8_t AGCMode                        = 1;  // 1 byte
   int8_t auto_IQ_correction             = 1;  // 1 byte
-  int8_t RF_attenuation                 = 2;  // 1 byte
 
   uint8_t dcfParityBit                  = 3;  // 1 byte
   uint8_t rate                          = 4;  // 1 byte
@@ -1015,8 +1042,9 @@ extern struct config_t {
   int agc_decay                         = 0;  // 4 bytes
   int agc_slope                         = 0;  // 4 bytes
   int AGC_thresh[NUM_BANDS];                  // 4 bytes
+  int attenuator;
   int audioPostProc[AUDIO_POST_PROCESSOR_BANDS];// 32 bytes
-  int audio_volume                      = 0;  // 4 bytes
+  int audioVolume                      = 0;  // 4 bytes
 
   int bwu[NUM_BANDS];                         // 4 bytes
   int bwl[NUM_BANDS];                         // 4 bytes
@@ -1038,12 +1066,14 @@ extern struct config_t {
   int paddleDit                         = 1;  // 4 bytes
   int powerLevel                        = 8;  // 4 bytes
   int rfg[NUM_BANDS];                         // 4 bytes
+  int rfGain;
 
   int spectrumNoiseFloor                = SPECTRUM_NOISE_FLOOR;  // 4 bytes
 
   int switchValues[NUMBER_OF_SWITCHES];       // 64 bytes
-
+  int tuneIndex                         = 4;  // 4 bytes, 500Hz
   int wordsPerMinute                    = 15; // 4 bytes
+  int xmtMode                           = SSB_MODE;
   int zetaHelp                          = 65; // 4 bytes
 
   uint16_t crc                          = 100;// 2 bytes, added when saving
@@ -1052,9 +1082,9 @@ extern struct config_t {
   int32_t spectrum_zoom                 = spectrum_zoom; // 4 bytes
 
   long calibration_constant             = 0;  // 4 bytes
-  long centerFreq                       = 7150000L;// 4 bytes
-  long currentFreqA                     = 7150000L;// 4 bytes
-  long currentFreqB                     = 7030000L;// 4 bytes
+  long centerFreq                       = 7047700L;// 4 bytes
+  long currentFreqA                     = 7047700L;// 4 bytes
+  long currentFreqB                     = 7150000L;// 4 bytes
   long favoriteFreqs[MAX_FAVORITES];          // 40 bytes
   long frequencyOffset                  = 0L; // 4 bytes
 
@@ -1087,7 +1117,7 @@ extern struct config_t {
   float32_t IQ_XAmpCorFactor            = 1.0;
   float32_t IQ_XPhanseCorFactor         = 0.0;
 
-} EEPROMData;                                 //  Total:       430 bytes
+} EEPROMData;                                 //  Total:       438 bytes
 
 //extern struct config_t EEPROMData;
 
@@ -1176,8 +1206,6 @@ extern Menu_D Menus[];
 //========================== Some are not in alpha order because of forward references =================================
 
 
-extern  int kTemp;
-extern int timerFlag;
 
 extern bool gEEPROM_current;            //mdrhere does the data in EEPROM match the current structure contents
 extern bool NR_gain_smooth_enable;
@@ -1185,6 +1213,7 @@ extern bool NR_long_tone_reset;
 extern bool NR_long_tone_enable;
 extern bool omitOutputFlag;
 extern bool timeflag;
+extern bool volumeChangeFlag;
 
 extern char *bigMorseCodeTree;
 extern char decodeBuffer[];
@@ -1205,12 +1234,12 @@ extern int8_t auto_IQ_correction;
 extern uint8_t IQ_RecCalFlag; //AFP 04-17-22
 extern int8_t first_block;
 extern int8_t Menu2;
+extern int8_t menuStatus;                       // 0 = no primary or secondary menu, 1 = primary, 2 = secondary
 extern int8_t mesz;
 extern int8_t mesz_old;
 extern int8_t NB_taps;
 extern int8_t NB_impulse_samples;
 extern int8_t NR_first_block;
-extern int8_t RF_attenuation;
 extern int8_t xmtMode;
 
 extern uint8_t agc_action;
@@ -1284,15 +1313,8 @@ extern const uint8_t NR_N_frames;
 extern int16_t activeVFO;
 extern int16_t currentMode;
 extern int16_t displayMode;
-extern int16_t EqualizerRecValues[];
-extern int16_t EqualizerXmtValues[];
-extern int16_t  fineEncoderRead;
-/*
-  extern int16_t DMAMEM pixelnew[];
-  extern int16_t DMAMEM pixelold[];
-  extern int16_t DMAMEM pixelnew2[];
-  extern int16_t DMAMEM pixelold2[];
-*/
+extern int16_t fineEncoderRead;
+
 extern int16_t  pixelnew[];
 extern int16_t  pixelold[];
 extern int16_t  pixelnew2[];    //AFP
@@ -1347,7 +1369,6 @@ extern const uint16_t n_dec2_taps;
 extern int encoderStepOld;
 extern int resultOldFactor;
 extern float incrFactor;
-extern int audio_volumeOld;
 extern int mute;
 extern int exciteOn;
 extern int agc_decay;
@@ -1360,8 +1381,10 @@ extern int ANR_in_idx;
 extern int ANR_mask;
 extern int ANR_position;
 extern int ANR_taps;
+extern int attenuator;
 extern int attack_buffsize;
-extern int audio_volume;
+extern int audioVolume;
+extern int audioVolumeOld;
 extern int audioYPixel[];
 extern int bandswitchPins[];
 extern int button9State;
@@ -1381,6 +1404,8 @@ extern int EEPROMChoice;
 extern int equalizerRecChoice;
 extern int equalizerXmtChoice;
 extern int fastTuneActive;
+extern volatile int filterEncoderMove;
+extern volatile long fineTuneEncoderMove;
 extern int filterLoPositionMarkerOld; // AFP 03-27-22 Layers
 extern int filterHiPositionMarkerOld;// AFP 03-27-22 Layers
 extern int freqCalibration;
@@ -1390,7 +1415,6 @@ extern int FHiCutOld;
 extern int (*functionPtr[])();
 extern int gapAtom;                                  //Space between atoms
 extern int gapChar;                                  // Space between characters
-
 extern int hang_counter;
 extern int helpmin;
 extern int helphour;
@@ -1403,6 +1427,7 @@ extern int IQChoice;
 extern int lidx, hidx;
 extern int LMS_nr_strength;
 extern int LP_F_help;
+extern int mainTuneEncoder;
 extern int micChoice;
 extern int minPinRead;
 extern int NR_Filter_Value;
@@ -1428,17 +1453,20 @@ extern int pmode;
 extern int pos_centre_f;
 extern int pos_x_frequency;
 extern int pos_y_smeter;
+extern int rfGain;
 extern int SAM_AM_Choice;
 extern int secondaryMenuChoiceMade;
 extern int smeterLength;
 extern int spectrumNoiseFloor;
+extern int splitOn;
 extern int SSB_AUTOTUNE_counter;
 extern int stepFTOld;
 extern int switchFilterSideband;    //AFP 1-28-21
-extern int switchThreshholds[];
+//extern int switchThreshholds[];
 extern int termCursorXpos;
+extern int timerFlag;
+extern int transmitPowerLevel;
 extern int tuneIndex;
-//extern int tunestep;
 extern int x2;                      //AFP
 extern int zeta_help;
 extern int zoom_sample_ptr;
@@ -1507,6 +1535,7 @@ extern long currentFreqA;;
 extern long currentFreqB;
 extern long currentWPM;
 extern long frequencyCorrection;
+extern long incrementValues[];
 extern long lastWPM;
 extern long notchCenterBin;
 extern long int n_clear;
@@ -1885,8 +1914,10 @@ void CalcCplxFIRCoeffs(float * coeffs_I, float * coeffs_Q, int numCoeffs, float3
 void CalcNotchBins();
 void Calculatedbm();
 void CenterFastTune();
+void CenterFilterOverlay();
 void Codec_gain();
 void ControlFilterF();
+void CWInterrupt();
 int  CWOptions();
 void CW_DecodeLevelDisplay();
 void Dah();
@@ -1900,7 +1931,7 @@ void DoGapHistogram(long valGap);
 void DrawSignalPlotFrame();
 void DoSignalHistogram(long val);
 void DoSignalPlot(float val);
-void DoSplitVFO();
+int  DoSplitVFO();
 void DoPaddleFlip();
 void DrawBandWidthIndicatorBar(); // AFP 03-27-22 Layers
 void DrawFrequencyBarValue();
@@ -1916,20 +1947,26 @@ void EEPROMSaveDefaults();
 void EEPROMShow();
 void EEPROMStuffFavorites(unsigned long current[]);
 void EEPROMWrite();
-void EncoderFilterAndWPM();
-void EncoderVolume();
+void EncoderFineTune();
+void EncoderFilter();
 void EncoderTune();
+void EncoderVolume();
 int  EqualizerRecOptions();
 int  EqualizerXmtOptions();
+void EraseMenus();
+void ErasePrimaryMenu();
+void EraseSecondaryMenu();
 void EraseSpectrumDisplayContainer();
 void ExecuteButtonPress(int val);
 void FilterBandwidth();
+void FilterSetSSB();
 void FormatFrequency(long f, char *b);
 int  FrequencyOptions();
 void FreqShift1();
 void FreqShift2();
 float goertzel_mag(int numSamples, int TARGET_FREQUENCY, int SAMPLING_RATE, float* data);
-int  GetEncoderValue(int minValue, int maxValue, int startValue, int increment);
+int  GetEncoderValue(int minValue, int maxValue, int startValue, int increment, char prompt[]);
+void GetFavoriteFrequency();
 void InitializeDataArrays();
 void InitFilterMask();
 void InitLMSNoiseReduction();
@@ -1946,6 +1983,7 @@ void LetterSpace();
 void LMSNoiseReduction(int16_t blockSize, float32_t *nrbuffer);
 float32_t log10f_fast(float32_t X);
 
+void MainTune();
 int  MicOptions();
 int  ModeOptions();
 void MorseCharacterDisplay(char currentLetter);
@@ -1953,6 +1991,7 @@ void MyDelay(unsigned long millisWait);
 void MyDrawFloat(float val, int decimals, int x, int y, char *buff);
 float MSinc(int m, float fc);
 
+void NoActiveMenu();
 void NoiseBlanker(float32_t* inputsamples, float32_t* outputsamples );
 int  NROptions();
 
@@ -1969,8 +2008,9 @@ int  RFOptions();
 
 int  SampleOptions();
 void SetCompressionLevel();
-void SetFastTuneFrequency();
+void SetFineTuneFrequency();
 void SaveAnalogSwitchValues();
+void ShowDecoderMessage();
 void sineTone(int numCycles);
 int  SpectrumOptions();
 void Send(char myChar);
@@ -1983,7 +2023,7 @@ void SetBand();
 void SetBandRelay(int state);
 void SetDecIntFilters();
 void SetDitLength(int wpm);
-void SetFavoriteFrequencies();
+void SetFavoriteFrequency();
 void SetFreq();
 int  SetI2SFreq(int freq);
 void SetIIRCoeffs(float32_t f0, float32_t Q, float32_t sample_rate, uint8_t filter_type);

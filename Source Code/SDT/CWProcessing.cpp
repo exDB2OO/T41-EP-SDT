@@ -15,25 +15,20 @@
 *****/
 void Dit()
 {
-#ifdef DEBUG  
-Serial.println("Into dit");
-analogWrite(A0, 128);
-MyDelay(ditLength);
-analogWrite(A0, 0);
-MyDelay(ditLength);
-#endif   
-/*
 
-//  digitalWrite(OPTO_OUTPUT, HIGH);    // Start dit
-//    digitalWrite(MUTE, LOW); 
-  recMix_3.gain(3, ON);
-  MyDelay(ditLength);
+  //  digitalWrite(OPTO_OUTPUT, HIGH);    // Start dit
+  digitalWrite(MUTE, ON);
+  while (digitalRead(KEYER_DIT_INPUT_TIP) == HIGH) {
+    recMix_3.gain(3, ON);
+  }
+
+  //    MyDelay(ditLength);
   recMix_3.gain(3, OFF);      //Turn off Sine Wave
-//  digitalWrite(OPTO_OUTPUT, LOW);     // End dit
-//    digitalWrite(MUTE, HIGH); 
-  MyDelay(ditLength);
-digitalWrite(KEYER_DIT_INPUT_TIP, HIGH); 
- */
+  //  digitalWrite(OPTO_OUTPUT, LOW);     // End dit
+  digitalWrite(MUTE, OFF);
+  //    MyDelay(ditLength);
+  digitalWrite(KEYER_DIT_INPUT_TIP, LOW);
+
 }
 
 /*****
@@ -49,22 +44,7 @@ digitalWrite(KEYER_DIT_INPUT_TIP, HIGH);
 *****/
 void Dah()
 {
-#ifdef DEBUG  
-Serial.println("Into dah");
-analogWrite(A0, 128);
-MyDelay(ditLength * 3);
-analogWrite(A0, 0);
-MyDelay(ditLength);
-#endif   
-/*
-//  digitalWrite(OPTO_OUTPUT, HIGH);    // Start dah
-  recMix_3.gain(3, ON);
-  MyDelay(ditLength * 3UL);
-  recMix_3.gain(3, OFF);
-//  digitalWrite(OPTO_OUTPUT, LOW);    // End dah
-  MyDelay(ditLength);
-digitalWrite(KEYER_DAH_INPUT_RING, HIGH); 
-*/
+  // In transistion
 }
 
 
@@ -255,22 +235,21 @@ void SetKeyType()
 *****/
 void MorseCharacterDisplay(char currentLetter)
 {
-  static int col = 0;                   // Start at lower left
+  static int col = 0;                                                       // Start at lower left
 
-  if (col < MAX_DECODE_CHARS) {                     // Start scrolling??
+  if (col < MAX_DECODE_CHARS) {                                             // Start scrolling??
     decodeBuffer[col] = currentLetter;
     col++;
-    decodeBuffer[col] = '\0';                                           // Make is a string
+    decodeBuffer[col] = '\0';                                               // Make is a string
   } else {
     memcpy(decodeBuffer, &decodeBuffer[1], MAX_DECODE_CHARS - 1);           // Slide array down 1 character
     decodeBuffer[col - 1] = currentLetter;                                  // Add to end
-    decodeBuffer[col] = '\0';                                       // Make is a string
- }
-  tft.fillRect(TEMP_X_OFFSET, TEMP_Y_OFFSET - 14, tft.getFontWidth() * (MAX_DECODE_CHARS + 1), tft.getFontHeight(), RA8875_BLACK);
-
+    decodeBuffer[col] = '\0';                                               // Make is a string
+  }
+  tft.fillRect(CW_TEXT_START_X, CW_TEXT_START_Y, CW_MESSAGE_WIDTH, CW_MESSAGE_HEIGHT * 2, RA8875_BLACK);
   tft.setFontScale( (enum RA8875tsize) 1);
   tft.setTextColor(RA8875_WHITE);
-  tft.setCursor(TEMP_X_OFFSET, TEMP_Y_OFFSET - 14);
+  tft.setCursor(CW_TEXT_START_X, CW_TEXT_START_Y);
   tft.print(decodeBuffer);
 }
 
@@ -319,12 +298,12 @@ void DisplayDitLength()
 *****/
 void Lookup(char currentAtom)
 {
-/*
-  char *bigMorseCodeTree  = "#EISH5##4##V###3##UF########?#2##ARL#########.###WP######J###1##TNDB6#####X######KC######Y######MGZ7####,Q######O#8######9##0####";
-                       //012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678
-                       //         10        20        30        40        50        60        70        80        90       100       110       120
-*/
-  currentDashJump = currentDashJump >> 1;         // Divide by 2
+  /*
+    char *bigMorseCodeTree  = "#EISH5##4##V###3##UF########?#2##ARL#########.###WP######J###1##TNDB6#####X######KC######Y######MGZ7####,Q######O#8######9##0####";
+                         //012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678
+                         //         10        20        30        40        50        60        70        80        90       100       110       120
+  */
+  currentDashJump = currentDashJump >> 1;         // Fast divide by 2
 
   if (currentAtom == '.') {
     currentDecoderIndex++;
@@ -348,7 +327,7 @@ void ResetHistograms()
   gapAtom = ditLength       = 80;             // Start with 15wpm ditLength
   gapChar = dahLength       = 240;
   thresholdGeometricMean    = 160;            // Use simple mean for starters so we don't have 0
-                                              // Clear graph arrays
+  // Clear graph arrays
   memset(signalHistogram, 0, HISTOGRAM_ELEMENTS * sizeof(uint32_t));
   memset(gapHistogram,    0, HISTOGRAM_ELEMENTS * sizeof(uint32_t));
   UpdateWPMField();
@@ -371,7 +350,7 @@ void DrawSignalPlotFrame()
 
   tft.setFontScale(0);
   tft.setTextColor(RA8875_GREEN);
-  tft.drawFastVLine(WATERFALL_LEFT_X + 60, FIRST_WATERFALL_LINE + 5, MAX_WATERFALL_ROWS - 25,    RA8875_GREEN);
+  tft.drawFastVLine(WATERFALL_LEFT_X + 60, FIRST_WATERFALL_LINE + 5, MAX_WATERFALL_ROWS - 25,  RA8875_GREEN);
   tft.drawFastHLine(WATERFALL_LEFT_X + 60, WATERFALL_BOTTOM - 20,    MAX_WATERFALL_WIDTH - 80, RA8875_GREEN);
   offset = WATERFALL_BOTTOM - 30;
   for (int i = 0; i < 5; i++) {
@@ -437,7 +416,7 @@ void DoSignalPlot(float val)
 *****/
 void DoCWDecoding(int audioValue)
 {
- 
+
   if (audioValue == 1 && signalStart == 0L) {                         // This is the start of the signal
     signalStart = millis();
     gapEnd      = signalStart;                                        // Must be at noise end
@@ -464,9 +443,9 @@ void DoCWDecoding(int audioValue)
       DoSignalHistogram(signalElapsedTime);                           //Yep
     }
 
-    if (gapLength > ditLength * 1.95) {                                // Is a char done??
+    if (gapLength > ditLength * 1.95) {                               // Is a char done??
       MorseCharacterDisplay(bigMorseCodeTree[currentDecoderIndex]);
-      if (gapLength > ditLength * 4.5) {      // good over 15WPM on W1AW; no Fransworth        
+      if (gapLength > ditLength * 4.5) {      // good over 15WPM on W1AW; no Fransworth
         MorseCharacterDisplay(' ');
         tft.setFontScale( (enum RA8875tsize) 0);                        // Show estimated WPM
         tft.setTextColor(RA8875_GREEN);
@@ -493,7 +472,6 @@ void DoCWDecoding(int audioValue)
           currentDecoderIndex += currentDashJump;
         }
       }
-   
     }
   }
 }
@@ -638,7 +616,7 @@ void DoSignalHistogram(long val)
 
   if ( (valRef2 >= valRef1 * compareFactor && gapRef1 <= valRef1 * compareFactor)
        || (valRef1 >= valRef2 * compareFactor && gapRef1 <= valRef2 * compareFactor) ) {
-                            // See if consecutive signal lengths in approximate dit to dah ratio and which one is larger
+    // See if consecutive signal lengths in approximate dit to dah ratio and which one is larger
     if (valRef2 >= valRef1) {
       aveDitLength = (long) (0.9 * aveDitLength + 0.1 * valRef1);             //Do some dit length averaging
       aveDahLength = (long) (0.9 * aveDahLength + 0.1 * valRef2);
@@ -653,19 +631,19 @@ void DoSignalHistogram(long val)
   signalHistogram[val]++;                             // Don't care which half it's in, just put it in
 
   offset = (uint32_t)thresholdGeometricMean - 1;      // Only do cast once
-                                                      // Dit calculation
-                                                      // 2nd parameter means we only look for dits below the geomean.
-                                                       
+  // Dit calculation
+  // 2nd parameter means we only look for dits below the geomean.
+
   for (int32_t j = (int32_t) thresholdGeometricMean; j; j--) {
     if (signalHistogram[j] != 0) {
       firstNonEmpty = j;
       break;
-    }                                                      
+    }
   }
-  
+
   JackClusteredArrayMax(signalHistogram, offset, &tempDit,  (int32_t *) &ditLength, &firstNonEmpty, (int32_t) 1);
-                                                      // dah calculation
-                                                      // Elements above the geomean. Note larger spread: higher variance
+  // dah calculation
+  // Elements above the geomean. Note larger spread: higher variance
   JackClusteredArrayMax(&signalHistogram[offset], HISTOGRAM_ELEMENTS - offset, &tempDah, (int32_t *) &dahLength, &firstNonEmpty, (uint32_t) 3);
   dahLength += (uint32_t) offset;
 
@@ -714,10 +692,7 @@ float goertzel_mag(int numSamples, int TARGET_FREQUENCY, int SAMPLING_RATE, floa
     q2 = q1;
     q1 = q0;
   }
-
-  // calculate the real and imaginary results
-  // scaling appropriately
-  real = (q1 - q2 * cosine) / scalingFactor;
+  real = (q1 - q2 * cosine) / scalingFactor;        // calculate the real and imaginary results scaling appropriately
   imag = (q2 * sine) / scalingFactor;
 
   magnitude = sqrtf(real * real + imag * imag);
@@ -726,7 +701,7 @@ float goertzel_mag(int numSamples, int TARGET_FREQUENCY, int SAMPLING_RATE, floa
 
 /*****
   Purpose:Display horizontal CW Decode level
-  
+
   Parameter list:
     void
 
@@ -744,4 +719,38 @@ void CW_DecodeLevelDisplay()
 
   tft.drawFastVLine (SMETER_X - levelMtrOffset,       SMETER_Y - 1, 20, RA8875_WHITE);    // charge 8 to 18
   tft.drawFastVLine (SMETER_X + 100 - levelMtrOffset, SMETER_Y - 1, 20, RA8875_WHITE);
+}
+
+/*****
+  Purpose: Read the keyer for closure
+
+  Parameter list:
+    void
+
+  Return value;
+    void
+*****/
+void CWInterrupt()
+{
+  if (KEYER_DIT_INPUT_TIP == 0) {
+    Dit();
+    digitalWrite(KEYER_DIT_INPUT_TIP, HIGH);
+  }
+  if (KEYER_DAH_INPUT_RING) {
+    Dah();
+    digitalWrite(KEYER_DAH_INPUT_RING, HIGH);
+  }
+}
+
+void ShowDecoderMessage()
+{
+  if (decoderFlag == SSB_MODE) {
+    return;
+  }
+  tft.setTextColor(RA8875_WHITE);
+  tft.setFontScale(0);
+  tft.setCursor(683, AUDIO_SPECTRUM_TOP + 5);
+  tft.print("CW Decoder");
+  tft.setCursor(680, AUDIO_SPECTRUM_TOP + 5 + tft.getFontHeight());
+  tft.print("Fine Adjust");
 }

@@ -78,9 +78,9 @@ void ZoomFFTExe(uint32_t blockSize)  //AFP changed resolution 03-12-21  Only for
         if (zoom_sample_ptr >= SPECTRUM_RES)
           zoom_sample_ptr = 0;
       }
-    } else                                                  // I have to think about this:
+    } else {                                                // I have to think about this:
       zoom_display = 0;                                     // when do we want to display a new spectrum?
-    
+    }
     float32_t multiplier = (float32_t)spectrum_zoom;
     if (spectrum_zoom > SPECTRUM_ZOOM_8) { // && spectrum_zoom < SPECTRUM_ZOOM_1024) {
       multiplier = (float32_t)(1 << spectrum_zoom);
@@ -89,8 +89,9 @@ void ZoomFFTExe(uint32_t blockSize)  //AFP changed resolution 03-12-21  Only for
       buffer_spec_FFT[idx * 2 + 0] =  multiplier * FFT_ring_buffer_x[zoom_sample_ptr] * (0.5 - 0.5 * cos(6.28 * idx / SPECTRUM_RES)); //Hanning Window AFP 03-12-21
       buffer_spec_FFT[idx * 2 + 1] =  multiplier * FFT_ring_buffer_y[zoom_sample_ptr] * (0.5 - 0.5 * cos(6.28 * idx / SPECTRUM_RES));
       zoom_sample_ptr++;
-      if (zoom_sample_ptr >= SPECTRUM_RES)
+      if (zoom_sample_ptr >= SPECTRUM_RES) {
         zoom_sample_ptr = 0;
+      }
     }
     //***************
     // adjust lowpass filter coefficient, so that
@@ -109,8 +110,6 @@ void ZoomFFTExe(uint32_t blockSize)  //AFP changed resolution 03-12-21  Only for
     for (int i = 0; i < SPECTRUM_RES; i++) {
       pixelold[i] = pixelnew[i];
     }
-
-
     // perform complex FFT
     // calculation is performed in-place the FFT_buffer [re, im, re, im, re, im . . .]
     arm_cfft_f32(spec_FFT, buffer_spec_FFT, 0, 1);
@@ -129,8 +128,9 @@ void ZoomFFTExe(uint32_t blockSize)  //AFP changed resolution 03-12-21  Only for
 
     for (int16_t x = 0; x < SPECTRUM_RES; x++) {
       pixelnew[x] = displayScale[currentScale].baseOffset + bands[currentBand].pixel_offset + (int16_t)(displayScale[currentScale].dBScale * log10f_fast(FFT_spec[x]));
-      if (pixelnew[x] > 220)
+      if (pixelnew[x] > 220) {
         pixelnew[x] = 220;
+      }
     }
   }
 }
@@ -145,7 +145,6 @@ void ZoomFFTExe(uint32_t blockSize)  //AFP changed resolution 03-12-21  Only for
 void CalcZoom1Magn()
 {
  if (updateDisplayFlag == 1) {
-
   float32_t spec_help = 0.0;
   float32_t LPFcoeff = 0.7;
   if (LPFcoeff > 1.0) {
@@ -172,7 +171,7 @@ void CalcZoom1Magn()
 
   for (int i = 0; i < SPECTRUM_RES/2; i++) {
       FFT_spec[i + SPECTRUM_RES/2] = (buffer_spec_FFT[i * 2] * buffer_spec_FFT[i * 2] + buffer_spec_FFT[i * 2 + 1] * buffer_spec_FFT[i * 2 + 1]);
-      FFT_spec[i] = (buffer_spec_FFT[(i + SPECTRUM_RES/2) * 2] * buffer_spec_FFT[(i + SPECTRUM_RES/2)  * 2] + buffer_spec_FFT[(i + SPECTRUM_RES/2)  * 2 + 1] * buffer_spec_FFT[(i + SPECTRUM_RES/2)  * 2 + 1]);
+      FFT_spec[i]                  = (buffer_spec_FFT[(i + SPECTRUM_RES/2) * 2] * buffer_spec_FFT[(i + SPECTRUM_RES/2)  * 2] + buffer_spec_FFT[(i + SPECTRUM_RES/2)  * 2 + 1] * buffer_spec_FFT[(i + SPECTRUM_RES/2)  * 2 + 1]);
     }
   // apply low pass filter and scale the magnitude values and convert to int for spectrum display
 
