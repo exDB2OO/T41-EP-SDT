@@ -27,6 +27,11 @@
 #include <EEPROM.h>
 
 //======================================== Symbolic Constants for Debugging and Version Control ========================
+<<<<<<< Updated upstream
+=======
+//DB2OO, 12.8.22: new version as NUM_BANDS now 9
+//#define VERSION                     "V018"
+>>>>>>> Stashed changes
 #define VERSION                     "V015"
 #define RIGNAME                     "T41-EP SDT"
 #define SPLASH_DELAY                1000L         // Probably should be 4000 to actually read it
@@ -319,7 +324,13 @@
 #endif
 
 #define MOSELEY                     0
+<<<<<<< Updated upstream
 #define TIMEZONE                    "EST: "     // Set for eastern time
+=======
+//DB2OO, 12.8.22: CET
+#define TIMEZONE                    "CET: "     // Set for eastern time
+//#define TIMEZONE                    "EST: "     // Set for eastern time
+>>>>>>> Stashed changes
 #define MOSELEY                     0
 
 #define DEFAULTFREQINCREMENT        1000L       //Values 10, 50, 250, 1000
@@ -362,7 +373,9 @@
 #define FILTERPIN80M                30    // 80M filter relay
 #define FILTERPIN40M                31    // 40M filter relay
 #define FILTERPIN20M                28    // 20M filter relay
-#define FILTERPIN15M                27    // 15M filter relay
+//DB2OO, 12.8.22: the 15m filter is controlled through PIN 29
+#define FILTERPIN15M                29    // 15M filter relay
+//#define FILTERPIN15M                27    // 15M filter relay
 #define RXTX                        22    // Transmit/Receive
 #define PTT                         37    // Transmit/Receive
 #define MUTE                        38    // Mute Audio,  HIGH = "On" Audio available from Audio PA, LOW = Mute audio
@@ -616,6 +629,9 @@
 
 #ifdef USE_W7PUA
 
+//DB2OO, 12.8.22: these macros are not used and also not any longer correct, when you add more bands
+#define BAND_40M                  1
+#if 0
 #define BAND_80M                  0
 #define BAND_40M                  1
 #define BAND_20M                  2
@@ -623,11 +639,16 @@
 #define BAND_15M                  4
 #define BAND_12M                  5
 #define BAND_10M                  6
+#endif
 
-#define FIRST_BAND                BAND_80M
-#define LAST_BAND                 BAND_10M    //AFP 1-28-21
-#define NUM_BANDS                 7           //AFP 1-28-21
-#define STARTUP_BAND              BAND_40M    //AFP 1-28-21
+//DB2OO, 12.8.22: 9 bands for 30m+60m
+#define NUM_BANDS                 8           //AFP 1-28-21
+//#define NUM_BANDS                 7           //AFP 1-28-21
+
+//DB2OO, 12.8.22: FIRST_BAND is 0, LAST_BAND is NUM_BANDS-1
+#define FIRST_BAND                0   //BAND_80M
+#define LAST_BAND                 NUM_BANDS-1  //BAND_10M    //AFP 1-28-21
+#define STARTUP_BAND              1 // BAND_40M    //AFP 1-28-21
 
 #endif
 

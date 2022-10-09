@@ -81,6 +81,9 @@ void EEPROMWrite()
   EEPROMData.xmtMode            = xmtMode;
 
   EEPROM.put(EEPROM_BASE_ADDRESS, EEPROMData);
+  //DB2OO, 12.8.22
+  Serial.print("sizeof(EEPROMData)");
+  Serial.println(sizeof(EEPROMData));
 } // end void eeProm SAVE
 
 /*****
@@ -472,6 +475,13 @@ void EEPROMSaveDefaults()
   }
 
   EEPROM.put(EEPROM_BASE_ADDRESS, EEPROMData);                        // Write as one large chunk
+<<<<<<< Updated upstream
+=======
+
+  //DB2OO, 12.8.22
+  Serial.print("sizeof(EEPROMData)");
+  Serial.println(sizeof(EEPROMData));
+>>>>>>> Stashed changes
 }                        //                                     -----------
 //              Total:                                            604 bytes
 

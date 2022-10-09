@@ -4,10 +4,17 @@
 
 /*****
   Purpose: Error message if Select button pressed with no Menu active
+<<<<<<< Updated upstream
 
   Parameter list:
     void
 
+=======
+
+  Parameter list:
+    void
+
+>>>>>>> Stashed changes
   Return value;
     void
 *****/
@@ -282,6 +289,43 @@ void ButtonFreqIncrement()
   Return value;
     int                   -1 if not valid push button, ADC value if valid
 *****/
+//DB2OO, 12.8.22: taken over from message 18096 but limited number of loops!
+#if 0
+int ReadSelectedPushButton()
+{
+<<<<<<< Updated upstream
+
+  minPinRead = analogRead(BUSY_ANALOG_PIN);
+ 
+  if (minPinRead > NOTHING_TO_SEE_HERE) {          // Value too high; not valid choice
+    return -1;
+  }
+  if (menuStatus == NO_MENUS_ACTIVE) {
+
+  }
+=======
+  minPinRead           = 0;
+  int buttonReadOld = 1024;
+  int maxLoops = 20;
+                                                                  // do exponential averaging to smooth out the button response
+  //DB2OO, 12.8.22: limit the max. number of loops
+  while ((abs(minPinRead - buttonReadOld) > 3) && maxLoops-- > 0 ) {
+    minPinRead      = analogRead(BUSY_ANALOG_PIN);
+    buttonRead       = .1 * minPinRead + (1 - .1) * buttonReadOld;      // See expected values in next function.
+    buttonReadOld = buttonRead;
+    //DB2OO, 12.8.22 added 10ms delay
+    MyDelay(10);
+  }
+  if (buttonRead > NOTHING_TO_SEE_HERE) {
+    return -1;
+  }
+  mainMenuIndex = minPinRead = buttonRead;
+  MyDelay(100L);
+>>>>>>> Stashed changes
+  return minPinRead;
+}
+#endif
+#if 1
 int ReadSelectedPushButton()
 {
 
@@ -295,6 +339,7 @@ int ReadSelectedPushButton()
   }
   return minPinRead;
 }
+#endif
 
 /*****
   Purpose: Determine which UI button was pressed

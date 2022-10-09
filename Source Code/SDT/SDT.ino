@@ -352,7 +352,11 @@ struct band bands[NUM_BANDS] = {  //AFP Changed 1-30-21
   //   freq       band low   band hi    mode    LSB/USB    Low    Hi  Gain  type    gain  AGC   pixel
   //                                                     filter filter             correct     offset
   3700000,   3500000,  3800000, "80M", DEMOD_LSB, -100, -4000, 15, HAM_BAND, 6.0, 30,   20,
+//DB2OO: 12.8.22 added 60m Band
+//5351500, 5366500, 5351500, "60M", DEMOD_USB, 4000,   100,  0, HAM_BAND, 7.0, 30,   20,
   7150000,   7000000,  7300000, "40M", DEMOD_LSB, -100, -4000,  0, HAM_BAND, 4.0, 30,   20,
+//DB2OO: 12.8.22 added 30m Band
+  10100000, 10150000, 10100000, "30M", DEMOD_USB, 4000,   100,  0, HAM_BAND, 7.0, 30,   20,
   14200000, 14000000, 14350000, "20M", DEMOD_USB, 4000,   100,  0, HAM_BAND, 7.0, 30,   20,
   18100000, 18068000, 18168000, "17M", DEMOD_USB, 4000,   100,  5, HAM_BAND, 6.0, 30,   20,
   21200000, 21000000, 21450000, "15M", DEMOD_USB, 4000,   100,  5, HAM_BAND, 6.0, 30,   20,
@@ -767,6 +771,7 @@ int audioVolumeOld2                       = 50;
 int audioYPixel[1024];
 int audioPostProcessorCells[AUDIO_POST_PROCESSOR_BANDS];
 
+<<<<<<< Updated upstream
 int bandswitchPins[]                      = {30,   // 80M
                                              31,   // 40M
                                              28,   // 20M
@@ -774,6 +779,18 @@ int bandswitchPins[]                      = {30,   // 80M
                                              29,   // 15M
                                              0,   // 12M
                                              0    // 10M
+=======
+//DB2OO, 12.8.22 corrected to symbolic names and added WARC bands correctly.
+int bandswitchPins[NUM_BANDS]               = {FILTERPIN80M,   // 80M
+//                                              FILTERPIN40M, //60M
+                                              FILTERPIN40M,   // 40M
+                                              FILTERPIN20M,   // 30M
+                                              FILTERPIN20M,   // 20M
+                                              FILTERPIN15M,    // 17M
+                                              FILTERPIN15M,   // 15M
+                                              0,   // 12M
+                                              0    // 10M
+>>>>>>> Stashed changes
                                             };
 int button9State;
 int buttonRead = 0;
@@ -1715,7 +1732,11 @@ void InitializeDataArrays()
   /****************************************************************************************
      start local oscillator Si5351
   ****************************************************************************************/
-  si5351.init(SI5351_CRYSTAL_LOAD_10PF, Si_5351_crystal, 230000);
+  //DB2OO, 18.8.22: with correction=230000 I was receiving a 14.2MHz signal at 14.1985MHz on the T41-EP
+  // with correction = 0 I was receiving a 14.2MHz signal at 14.1951MHz on the T41-EP --> 345189
+  // 10MHz from OCXO --> 9.999966MHz with correction=354189 --> 348589
+  si5351.init(SI5351_CRYSTAL_LOAD_10PF, Si_5351_crystal, 348589);
+  //si5351.init(SI5351_CRYSTAL_LOAD_10PF, Si_5351_crystal, 230000);
 
   SetFreq();
   MyDelay(100L);
@@ -1975,12 +1996,21 @@ void setup()
   // ========================  Initial set up of EEPROM data ===============
 
   EEPROMRead();                                     // Read what's stored in EEPROM...junk or not?
+<<<<<<< Updated upstream
 
   if (EEPROMData.version_of_settings[0] != 'V') {   // EEPROM has not been set
     EEPROMSaveDefaults();                           // Use default values so things will work
     SaveAnalogSwitchValues();                       // Call to reset switch matrix values
   }
 
+=======
+
+//DB2OO, 12.8.22: changed based on message 18161
+  if (strcmp(EEPROMData.version_of_settings, VERSION) != 0) {   // EEPROM has not been set, save defaults and do switch matrix
+    EEPROMSaveDefaults();                           // Use default values so things will work
+    SaveAnalogSwitchValues();                       // Call to reset switch matrix values
+  }
+>>>>>>> Stashed changes
 #ifdef DEBUG
   EEPROMShow();
 #endif

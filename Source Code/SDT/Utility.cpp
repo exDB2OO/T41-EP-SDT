@@ -666,6 +666,77 @@ void Autotune() {
   }
 }
 
+
+/*****
+  Purpose: function reads the analog value for each matrix switch and stores that value in EEPROM.
+           Only called if STORE_SWITCH_VALUES is uncommented.
+
+  Parameter list:
+    void
+
+  Return value;
+    void
+*****/
+//DB2OO, 12.8.22: new version from message 18161
+void SaveAnalogSwitchValues()
+{
+  const char *labels[] = {"Select",       "Menu Up",  "Band Up",
+                          "Zoom",         "Menu Dw",  "Band Dn",
+                          "Filter",       "DeMod",    "Mode",
+                          "NR",           "Notch",    "Display",
+                          "Noise Floor",  "User 1",   "CW Reset",
+                          "Tune Incrmt",  "User 2",   "User 3"
+                         };
+  int index;
+  int minVal;
+  int value;
+
+  tft.fillWindow(RA8875_BLACK);
+  tft.setFontScale(1);
+  tft.setTextColor(RA8875_GREEN);
+  tft.setCursor(10, 10);
+  tft.print("Press the button");
+  tft.setCursor(10, 30);
+  tft.print("you have assigned to");
+  tft.setCursor(10, 50);
+  tft.print("the named switch shown.");
+
+  for (index = 0; index < NUMBER_OF_SWITCHES; ) {
+    tft.setCursor(20, 100);
+    tft.print(index + 1);
+    tft.print(". ");
+    tft.print(labels[index]);
+    value = -1;
+    minVal = NOTHING_TO_SEE_HERE;
+    while (true) {
+      value = ReadSelectedPushButton();
+      MyDelay(100L);
+      if (value < NOTHING_TO_SEE_HERE && value > 0) {
+        if (value < minVal) {
+          minVal = value;
+        } else {
+          value = -1;
+          break;
+        }
+      }
+    }
+    if (value == -1) {
+      tft.fillRect(20, 100, 300, 40, RA8875_BLACK);
+      tft.setCursor(400, 20 + index * 25);
+      tft.print(index + 1);
+      tft.print(". ");
+      tft.print(labels[index]);
+      tft.setCursor(650, 20 + index * 25);
+      tft.print(minVal);
+      EEPROMData.switchValues[index] = minVal;
+      index++;
+      MyDelay(100L);
+    }
+  }
+  EEPROM.put(0, EEPROMData);                        // Save values to EEPROM
+}
+
+#if 0 && OLDVERSION
 /*****
   Purpose: function reads the analog value for each matrix switch and stores that value in EEPROM.
            Only called if STORE_SWITCH_VALUES is uncommented.
@@ -735,6 +806,7 @@ void SaveAnalogSwitchValues()
   }
   EEPROM.put(0, EEPROMData);                        // Save values to EEPROM
 }
+#endif
 
 // ================== Clock stuff
 /*****
@@ -752,7 +824,9 @@ void DisplayClock()
   temp[0]       = '\0';
   timeBuffer[0] = '\0';
   strcpy(timeBuffer, TIMEZONE);         // e.g., EST
-  itoa(hourFormat12(), temp, DEC);
+  //DB2OO, 12.8.22: 24h format
+  itoa(hour(), temp, DEC);
+  //  itoa(hourFormat12(), temp, DEC);
   if (strlen(temp) < 2) {
     strcat(timeBuffer, "0");
   }
